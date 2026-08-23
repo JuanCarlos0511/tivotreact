@@ -26,7 +26,13 @@
     "noImplicitReturns": true,
     "noImplicitOverride": true,
     "baseUrl": ".",
-    "paths": { "@/*": ["src/*"], "@config/*": ["src/config/*"], "@core/*": ["src/core/*"], "@domain/*": ["src/core/domain/*"], "@application/*": ["src/core/application/*"], "@infrastructure/*": ["src/infrastructure/*"], "@presentation/*": ["src/presentation/*"], "@shared/*": ["src/shared/*"] }
+    "paths": {
+      "@/*": ["src/*"],
+      "@config/*": ["src/config/*"],
+      "@features/*": ["src/features/*"],
+      "@services/*": ["src/services/*"],
+      "@shared/*": ["src/shared/*"]
+    }
   },
   "include": ["src"]
 }

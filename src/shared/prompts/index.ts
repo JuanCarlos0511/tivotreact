@@ -1,1 +1,1 @@
-export * from './tivot-generation.prompt'
+export * from './tivot-system.prompt'

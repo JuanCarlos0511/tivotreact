@@ -1,4 +1,4 @@
-import type { TivotProblem } from '@domain/entities/tivot-problem.entity'
+import type { TivotProblem } from '@shared/types'
 
 export const TIVOT_PROBLEM_CATALOG: TivotProblem[] = [
   {

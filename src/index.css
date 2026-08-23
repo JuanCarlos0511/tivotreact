@@ -100,13 +100,20 @@ button { cursor: pointer; }
 .settings-modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
 .settings-eyebrow { margin: 0 0 6px; color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; }
 .settings-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 28px; }
+.settings-row + .settings-row { margin-top: 16px; }
+.settings-row-stacked { grid-template-columns: 1fr; row-gap: 9px; }
 .settings-row-label { color: var(--muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .theme-switch { display: inline-flex; align-items: center; justify-self: end; gap: 10px; }
+.provider-switch { display: flex; flex-wrap: wrap; gap: 8px; }
 .theme-option { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; padding: 9px 12px; border: 1px solid var(--composer-border); border-radius: 14px; color: var(--muted); background: var(--sidebar-button); font-size: 12px; font-weight: 600; text-align: left; transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease; }
 :root[data-theme='light'] .theme-option { color: #66716b; }
 .theme-option:hover { background: var(--sidebar-hover); color: var(--text); }
 .theme-option.active { color: var(--text); border-color: rgba(43, 229, 138, 0.34); background: var(--sidebar-button); box-shadow: 0 0 0 1px rgba(43, 229, 138, 0.08), 0 0 14px rgba(43, 229, 138, 0.22); }
 .theme-option svg { flex: 0 0 auto; color: var(--accent); }
+.settings-field { display: grid; gap: 8px; margin-top: 16px; text-align: left; }
+.settings-input-shell { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border: 1px solid var(--composer-border); border-radius: 8px; color: var(--accent); background: var(--composer-bg); }
+.settings-input-shell input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--text); background: transparent; font-size: 12px; }
+.settings-save-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 16px; padding: 10px 12px; border: 0; border-radius: 8px; color: #0b170f; background: linear-gradient(180deg, var(--accent-strong), var(--accent)); font-size: 12px; font-weight: 800; }
 .settings-placeholder { min-height: 72px; margin-top: 14px; }
 .chat-history-copy,
 .chat-history-copy strong,
