@@ -35,6 +35,11 @@ export function ChatWorkspace({
 
   return (
     <section className="workspace">
+      <div className="ambient-field" aria-hidden="true">
+        <span className="node node-one" />
+        <span className="node node-two" />
+        <span className="node node-three" />
+      </div>
       <div className="conversation-stage">
         <header className="conversation-header">
           <div>

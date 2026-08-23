@@ -73,8 +73,8 @@ button { cursor: pointer; }
 .app-shell { position: relative; display: flex; min-height: 100vh; overflow: hidden; background: var(--shell-bg); }
 .app-shell::before { position: absolute; inset: 0; z-index: 0; pointer-events: none; content: ''; opacity: 0.72; background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px), radial-gradient(circle at 50% 43%, var(--shell-haze), transparent 0 26%, rgba(0, 0, 0, 0) 40%); background-size: 120px 120px, 120px 120px, auto; mask-image: radial-gradient(circle at center, black 55%, transparent 100%); }
 .app-shell > * { position: relative; z-index: 1; }
-.sidebar { position: relative; width: 242px; padding: 10px 12px 14px; display: flex; flex-direction: column; gap: 12px; border-right: 1px solid var(--line); background: var(--sidebar-surface); backdrop-filter: blur(14px); box-shadow: inset -1px 0 0 rgba(255,255,255,0.025); transition: width 0.22s ease, padding 0.22s ease, background 0.2s ease, border-color 0.2s ease; }
-.sidebar-collapsed { width: 58px; padding: 10px 8px 14px; }
+.sidebar { position: relative; width: 242px; min-width: 242px; padding: 10px 12px 14px; display: flex; flex-direction: column; gap: 12px; border-right: 1px solid var(--line); background: var(--sidebar-surface); backdrop-filter: blur(14px); box-shadow: inset -1px 0 0 rgba(255,255,255,0.025); transition: width 0.22s ease, min-width 0.22s ease, padding 0.22s ease, background 0.2s ease, border-color 0.2s ease; }
+.sidebar-collapsed { width: 58px; min-width: 58px; padding: 10px 8px 14px; }
 .sidebar-toggle { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 999px; color: var(--muted); background: transparent; }
 .sidebar-toggle:hover { color: var(--text); background: rgba(28, 34, 32, 0.72); }
 .sidebar-top { display: grid; gap: 12px; }
@@ -85,11 +85,13 @@ button { cursor: pointer; }
 .new-chat-button:hover { border-color: rgba(125, 234, 170, 0.28); background: var(--sidebar-hover); }
 .history-heading { padding: 2px 10px 0; color: rgba(190, 198, 194, 0.74); font-size: 9px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; }
 :root[data-theme='light'] .history-heading { color: #5f6d67; opacity: 1; font-weight: 900; letter-spacing: 1.7px; }
-.chat-history { display: grid; gap: 8px; overflow-y: auto; padding-top: 4px; }
-.chat-history-item { display: flex; align-items: center; width: 100%; padding: 10px 11px; border: 0; border-radius: 9px; color: var(--muted); background: transparent; text-align: left; }
+.chat-history { display: grid; gap: 8px; min-width: 0; overflow-x: hidden; overflow-y: auto; padding-top: 4px; }
+.chat-history-item { position: relative; display: flex; align-items: center; width: 100%; min-width: 0; padding: 10px 11px; border: 0; border-radius: 9px; color: var(--muted); background: transparent; text-align: left; }
 .chat-history-item:hover { background: var(--sidebar-hover); color: var(--text); }
 .chat-history-item.active { color: var(--text); background: transparent; box-shadow: inset 2px 0 var(--accent); }
-.chat-history-title { overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.chat-history-title { display: block; min-width: 0; overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-title-tooltip { position: fixed; left: 252px; z-index: 30; max-width: 280px; padding: 11px 14px; border: 1px solid var(--panel-border); border-radius: 8px; color: var(--text); background: var(--surface-raised); box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28); font-size: 12px; font-weight: 700; line-height: 1.35; pointer-events: none; transform: translateY(-50%); }
+:root[data-theme='light'] .sidebar-title-tooltip { box-shadow: 0 14px 28px rgba(78, 72, 58, 0.18); }
 .sidebar-footer { margin-top: auto; padding-top: 8px; }
 .settings-button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 11px; border: 0; border-radius: 10px; color: var(--muted); background: transparent; font-size: 12px; font-weight: 600; text-align: left; }
 .settings-button:hover { background: rgba(28, 34, 32, 0.72); color: var(--text); }

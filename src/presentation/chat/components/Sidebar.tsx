@@ -1,3 +1,4 @@
+import { useState, type SyntheticEvent } from 'react'
 import { MessageSquarePlus, PanelLeft, PanelRight, Settings } from 'lucide-react'
 import type { TivotChatSession } from '../types'
 
@@ -12,6 +13,11 @@ interface SidebarProps {
   onOpenSettings: () => void
 }
 
+interface SidebarTooltip {
+  title: string
+  top: number
+}
+
 export function Sidebar({
   sessions,
   activeSessionId,
@@ -22,6 +28,18 @@ export function Sidebar({
   onSelectSession,
   onOpenSettings,
 }: SidebarProps) {
+  const [tooltip, setTooltip] = useState<SidebarTooltip | null>(null)
+
+  const showTooltip = (event: SyntheticEvent<HTMLButtonElement>, title: string) => {
+    if (!isOpen) return
+
+    const rect = event.currentTarget.getBoundingClientRect()
+    setTooltip({
+      title,
+      top: rect.top + rect.height / 2,
+    })
+  }
+
   return (
     <aside className={`sidebar ${isOpen ? '' : 'sidebar-collapsed'}`}>
       <button
@@ -48,7 +66,12 @@ export function Sidebar({
           <button
             key={session.id}
             className={`chat-history-item ${activeSessionId === session.id ? 'active' : ''}`}
+            data-title={session.title}
             onClick={() => onSelectSession(session.id)}
+            onMouseEnter={(event) => showTooltip(event, session.title)}
+            onMouseLeave={() => setTooltip(null)}
+            onFocus={(event) => showTooltip(event, session.title)}
+            onBlur={() => setTooltip(null)}
             type="button"
           >
             <span className="chat-history-title">{session.title}</span>
@@ -61,6 +84,11 @@ export function Sidebar({
           <span>Configuracion</span>
         </button>
       </div>
+      {tooltip && (
+        <div className="sidebar-title-tooltip" style={{ top: tooltip.top }} role="tooltip">
+          {tooltip.title}
+        </div>
+      )}
     </aside>
   )
 }
