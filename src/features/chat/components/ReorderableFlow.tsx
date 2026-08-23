@@ -103,7 +103,7 @@ export function ReorderableFlow({ payload, submission, onSubmit }: ReorderableFl
       {isLocked && submission?.feedback && (
         <div className={`flow-feedback ${submission.feedback.metadata.passed ? 'flow-feedback-success' : 'flow-feedback-warning'}`}>
           <MarkdownMessage text={submission.feedback.message} />
-          <small>{submission.llmInvoked ? 'Pista generada por IA' : 'Validacion determinista: 0 tokens'}</small>
+          <small>{submission.llmInvoked ? 'Pista de Tivot' : 'Revisado al instante'}</small>
         </div>
       )}
     </section>

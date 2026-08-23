@@ -4,6 +4,7 @@ import type {
   TivotAssistantChatMessage,
   TivotAssistantPayload,
   TivotChatSession,
+  TivotConversationContext,
   TivotProblem,
 } from '@shared/types'
 import {
@@ -16,7 +17,7 @@ import { processTivotUserAction } from '@services/inference.service'
 
 const createMessageId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
 
-const conceptFromProblem = (problem: TivotProblem) => problem.tags[0] ?? 'Arquitectura POS'
+const conceptFromProblem = (problem: TivotProblem) => problem.tags[0] ?? 'Algoritmos'
 
 const rotateNodes = <T,>(items: T[]): T[] => {
   const [firstItem, ...restItems] = items
@@ -42,7 +43,7 @@ const createPayloadFromProblem = (problem: TivotProblem): TivotAssistantPayload 
   }
 
   return createStandardTextPayload(
-    `${problem.system_context}\n\nQue decision de diseno protegeria el dato critico sin mezclar reglas de cobro?`,
+    `${problem.system_context}\n\nQue paso le darias al robot para que sepa que hacer?`,
     {
       is_evaluation: false,
       passed: null,
@@ -58,6 +59,35 @@ const createAssistantMessage = (payload: TivotAssistantPayload): TivotAssistantC
   payload,
   submission: null,
   createdAt: new Date().toISOString(),
+})
+
+const createUserMessage = (content: string) => ({
+  id: createMessageId('user'),
+  role: 'user' as const,
+  content,
+  createdAt: new Date().toISOString(),
+})
+
+const appendStarterTurn = (
+  context: TivotConversationContext,
+  prompt: string,
+  payload: TivotAssistantPayload,
+): TivotConversationContext => ({
+  metadata: {
+    active_problem_id: payload.problem_id,
+    attempt_count: 0,
+  },
+  turns: [
+    ...context.turns,
+    {
+      user_message: prompt,
+      assistant_message: payload.message,
+      assistant_type: payload.type,
+      problem_id: payload.problem_id,
+      metadata: payload.metadata,
+      created_at: new Date().toISOString(),
+    },
+  ].slice(-3),
 })
 
 const createInitialSessions = (): TivotChatSession[] =>
@@ -81,22 +111,14 @@ export const useTivotChat = () => {
     [activeSessionId, sessions],
   )
 
-  const createChat = () => {
+  const startNewChat = () => {
     const id = createMessageId('chat')
-    const welcomePayload = createStandardTextPayload(
-      'Trae un caso POS: doble cobro, stock negativo, caja descuadrada o descuentos en conflicto. Lo reducimos a invariantes.',
-      {
-        is_evaluation: false,
-        passed: null,
-        concept: 'Arquitectura POS',
-      },
-    )
 
     const newSession: TivotChatSession = {
       id,
-      title: 'Nueva conversacion POS',
+      title: 'Nueva mision',
       context: createEmptyTivotConversationContext(),
-      messages: [createAssistantMessage(welcomePayload)],
+      messages: [],
     }
 
     setSessions((currentSessions) => [newSession, ...currentSessions])
@@ -108,13 +130,46 @@ export const useTivotChat = () => {
     const trimmedQuery = query.trim()
     if (!trimmedQuery || !activeSession || isResponding) return
 
-    const sessionSnapshot = activeSession
-    const userMessage = {
-      id: createMessageId('user'),
-      role: 'user' as const,
-      content: trimmedQuery,
-      createdAt: new Date().toISOString(),
+    await submitPrompt(trimmedQuery)
+  }
+
+  const handleSelectStarterTopic = async (prompt: string, problemId?: string) => {
+    if (!activeSession || isResponding) return
+
+    const selectedProblem = problemId
+      ? TIVOT_PROBLEM_CATALOG.find((problem) => problem.problem_id === problemId)
+      : null
+
+    if (!selectedProblem) {
+      await submitPrompt(prompt)
+      return
     }
+
+    const sessionSnapshot = activeSession
+    const userMessage = createUserMessage(prompt)
+    const assistantPayload = createPayloadFromProblem(selectedProblem)
+    const assistantMessage = createAssistantMessage(assistantPayload)
+
+    setQuery('')
+    setSessions((currentSessions) =>
+      currentSessions.map((session) =>
+        session.id === sessionSnapshot.id
+          ? {
+              ...session,
+              title: selectedProblem.title,
+              context: appendStarterTurn(session.context, prompt, assistantPayload),
+              messages: [...session.messages, userMessage, assistantMessage],
+            }
+          : session,
+      ),
+    )
+  }
+
+  const submitPrompt = async (prompt: string) => {
+    if (!activeSession || isResponding) return
+
+    const sessionSnapshot = activeSession
+    const userMessage = createUserMessage(prompt)
 
     setQuery('')
     setIsResponding(true)
@@ -127,7 +182,7 @@ export const useTivotChat = () => {
     )
 
     const response = await processTivotUserAction({
-      userPayload: { user_action: 'send_message', message: trimmedQuery },
+      userPayload: { user_action: 'send_message', message: prompt },
       context: sessionSnapshot.context,
     })
 
@@ -136,6 +191,7 @@ export const useTivotChat = () => {
         session.id === sessionSnapshot.id
           ? {
               ...session,
+              title: session.messages.length === 1 ? prompt.slice(0, 48) : session.title,
               context: response.context,
               messages: [...session.messages, createAssistantMessage(response.payload)],
             }
@@ -213,8 +269,10 @@ export const useTivotChat = () => {
     isResponding,
     setActiveSessionId,
     setQuery,
-    createChat,
     submitMessage,
+    handleSelectStarterTopic,
+    createChat: startNewChat,
+    startNewChat,
     submitFlowOrder,
   }
 }

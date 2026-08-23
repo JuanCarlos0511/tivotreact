@@ -57,7 +57,7 @@ export function Sidebar({
         </div>
         <button className="new-chat-button" onClick={onCreateChat} type="button">
           <MessageSquarePlus size={16} />
-          <span>Nueva conversacion</span>
+          <span>Nueva mision</span>
         </button>
       </div>
       <div className="history-heading">Recientes</div>
@@ -67,7 +67,10 @@ export function Sidebar({
             key={session.id}
             className={`chat-history-item ${activeSessionId === session.id ? 'active' : ''}`}
             data-title={session.title}
-            onClick={() => onSelectSession(session.id)}
+            onClick={() => {
+              setTooltip(null)
+              onSelectSession(session.id)
+            }}
             onMouseEnter={(event) => showTooltip(event, session.title)}
             onMouseLeave={() => setTooltip(null)}
             onFocus={(event) => showTooltip(event, session.title)}

@@ -83,11 +83,11 @@ const resolveFlowSubmission = async (
   if (!evaluation) {
     return {
       payload: createStandardTextPayload(
-        'No encuentro ese problema activo. Elige un flujo del catalogo y revisamos el orden desde ahi.',
+        'No encuentro esa mision. Elige una tarjeta y armamos los pasos juntos.',
         {
           is_evaluation: true,
           passed: false,
-          concept: 'Catalogo POS',
+          concept: 'Misiones',
         },
       ),
       rawAnswer: null,
@@ -124,11 +124,11 @@ const answerConversation = async (
   catalog: TivotProblem[],
 ): Promise<InferenceResult> => {
   const fallbackPayload = createStandardTextPayload(
-    'Llevemoslo a POS: que dato queda inconsistente si esa operacion se repite, falla a medias o se cruza con otra caja?',
+    'Probemos con pasos pequenos: que deberia hacer primero el robot para no confundirse?',
     {
       is_evaluation: false,
       passed: null,
-      concept: 'Arquitectura POS',
+      concept: 'Algoritmos',
     },
   )
 
@@ -276,17 +276,17 @@ const findFailureHint = (
 
   return {
     violatedRule,
-    hint: 'Que estado queda comprometido si confirmas un paso irreversible antes de reservar o validar la operacion anterior?',
+    hint: 'Si fueras el robot, que paso necesitas entender antes de hacer este?',
   }
 }
 
 const createPassedPayload = (problem: TivotInteractiveFlowProblem): TivotStandardTextPayload =>
   createStandardTextPayload(
-    'Correcto. La secuencia conserva la atomicidad: primero protege el recurso, luego valida el cobro y al final confirma los efectos permanentes.',
+    'Muy bien. Tu robot pudo seguir la mision porque cada paso llego en el momento correcto.',
     {
       is_evaluation: true,
       passed: true,
-      concept: problem.tags[0] ?? 'Arquitectura POS',
+      concept: problem.tags[0] ?? 'Algoritmos',
     },
     problem.problem_id,
   )
@@ -300,7 +300,7 @@ const createFailedPayload = (
     {
       is_evaluation: true,
       passed: false,
-      concept: problem.tags[0] ?? 'Arquitectura POS',
+      concept: problem.tags[0] ?? 'Algoritmos',
     },
     problem.problem_id,
   )

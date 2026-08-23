@@ -7,12 +7,12 @@ export class MockTivotAdapter implements AiProvider {
 
     const payload = createStandardTextPayload(
       isEvaluation
-        ? 'Antes de confirmar, que recurso compartido queda sin proteger si inviertes esos pasos?'
-        : 'Piensa en el invariante POS: dinero, ticket y stock deben cambiar juntos. Cual de esos tres podria quedar duplicado o atrasado?',
+        ? 'Mira el camino como si fueras el robot: que paso deberia pasar justo antes de este?'
+        : 'Vamos con una mision pequena: dime los pasos como si el robot solo pudiera obedecer una instruccion a la vez.',
       {
         is_evaluation: isEvaluation,
         passed: isEvaluation ? false : null,
-        concept: isEvaluation ? 'ACID' : 'Arquitectura POS',
+        concept: isEvaluation ? 'Orden de pasos' : 'Algoritmos',
       },
     )
 

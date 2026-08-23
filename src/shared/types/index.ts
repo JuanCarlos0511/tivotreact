@@ -172,3 +172,14 @@ export interface TivotResponse {
   algorithmUsed: boolean
   llmInvoked: boolean
 }
+
+export type StarterTopicIcon = 'robot' | 'repeat' | 'decision' | 'bug'
+
+export interface TivotStarterTopic {
+  id: string
+  title: string
+  description: string
+  prompt: string
+  problemId?: string
+  icon: StarterTopicIcon
+}

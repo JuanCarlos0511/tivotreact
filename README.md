@@ -1,6 +1,6 @@
 # Tivot React
 
-Tivot es un tutor conversacional para razonar sobre algoritmia, arquitectura y logica de sistemas POS. La app esta enfocada en presentar problemas, parsear respuestas JSON de IA y evaluar flujos interactivos de ordenamiento.
+Tivot es un tutor conversacional para ninos que empiezan a aprender algoritmia y programacion basica con robots, recetas, pasos, repeticiones, decisiones y busqueda de errores. La app esta enfocada en presentar misiones, parsear respuestas JSON de IA y evaluar flujos interactivos de ordenamiento.
 
 ## Estructura
 

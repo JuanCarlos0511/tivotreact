@@ -42,6 +42,7 @@ function App() {
         onQueryChange={chat.setQuery}
         onSubmitMessage={chat.submitMessage}
         onSubmitFlowOrder={chat.submitFlowOrder}
+        onSelectStarterTopic={chat.handleSelectStarterTopic}
       />
     </main>
   )
