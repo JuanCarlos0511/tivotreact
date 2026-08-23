@@ -1,3 +1,10 @@
-import type { PosIntent } from '../../domain/value-objects/intent.vo'
+import type { TivotAssistantPayload } from '@domain/value-objects/tivot-payload.vo'
+import type { TivotConversationContext } from './tivot-conversation-context.dto'
 
-export interface PosQueryResponse { intent: PosIntent | null; answer: string; algorithmUsed: boolean }
+export interface PosQueryResponse {
+  payload: TivotAssistantPayload
+  context: TivotConversationContext
+  rawAnswer: string | null
+  algorithmUsed: boolean
+  llmInvoked: boolean
+}
