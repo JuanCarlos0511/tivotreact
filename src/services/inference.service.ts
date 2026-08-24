@@ -1,4 +1,5 @@
 import type {
+  AiChatMessage,
   TivotAssistantPayload,
   TivotConversationContext,
   TivotConversationMetadata,
@@ -9,12 +10,13 @@ import type {
   TivotUserPayload,
 } from '@shared/types'
 import { TIVOT_PROBLEM_CATALOG } from '@shared/catalog'
-import { buildConversationPrompt, buildFlowHintPrompt } from '@shared/prompts'
+import { TIVOT_SYSTEM_PROMPT, buildConversationPrompt, buildFlowHintPrompt } from '@shared/prompts'
 import { createStandardTextPayload, isInteractiveFlowProblem } from '@shared/types'
 import { createAiProvider } from './ai'
 import { parseAssistantPayload } from './parser.service'
 
 const MAX_CONTEXT_TURNS = 3
+const MAX_CONTEXT_MESSAGES = 6
 
 interface ProcessUserActionInput {
   userPayload: TivotUserPayload
@@ -65,7 +67,7 @@ const resolvePayload = async (
     return resolveFlowSubmission(userPayload.problem_id, userPayload.submitted_order, catalog)
   }
 
-  const inferenceResult = await answerConversation(userPayload.message, context, catalog)
+  const inferenceResult = await answerConversation(userPayload.message, context)
 
   return {
     ...inferenceResult,
@@ -121,18 +123,17 @@ const resolveFlowSubmission = async (
 const answerConversation = async (
   query: string,
   context: TivotConversationContext,
-  catalog: TivotProblem[],
 ): Promise<InferenceResult> => {
   const fallbackPayload = createStandardTextPayload(
-    'Probemos con pasos pequenos: que deberia hacer primero el robot para no confundirse?',
+    'Hola, soy Tivot, tu tutor de programacion basica con ejemplos de punto de venta. Podemos ver variables, IF, listas o bucles usando una caja registradora; que tema quieres probar primero?',
     {
       is_evaluation: false,
       passed: null,
-      concept: 'Algoritmos',
+      concept: 'Fundamentos POS',
     },
   )
 
-  return completeWithFallback(buildConversationPrompt(query, context, catalog), fallbackPayload)
+  return completeWithFallback(buildConversationPrompt(query), fallbackPayload, buildCleanChatMessages(query, context))
 }
 
 const answerFlowFailure = async (
@@ -146,13 +147,13 @@ const answerFlowFailure = async (
 const completeWithFallback = async (
   prompt: string,
   fallbackPayload: TivotAssistantPayload,
+  messages?: AiChatMessage[],
 ): Promise<InferenceResult> => {
   try {
-    const rawAnswer = await createAiProvider().complete(prompt)
-    const parsedPayload = parseAssistantPayload(rawAnswer)
+    const rawAnswer = await createAiProvider().complete(prompt, messages)
 
     return {
-      payload: parsedPayload ?? fallbackPayload,
+      payload: parseAssistantPayload(rawAnswer),
       rawAnswer,
       llmInvoked: true,
     }
@@ -164,6 +165,17 @@ const completeWithFallback = async (
     }
   }
 }
+
+const buildCleanChatMessages = (query: string, context: TivotConversationContext): AiChatMessage[] => [
+  { role: 'system', content: TIVOT_SYSTEM_PROMPT },
+  ...context.turns.flatMap(cleanTurnMessages).slice(-MAX_CONTEXT_MESSAGES),
+  { role: 'user', content: query },
+]
+
+const cleanTurnMessages = (turn: TivotConversationContext['turns'][number]): AiChatMessage[] => [
+  { role: 'user', content: turn.user_message },
+  { role: 'assistant', content: turn.assistant_message },
+]
 
 const evaluateFlowOrder = (
   problemId: string,
@@ -242,12 +254,8 @@ const summarizeUserPayload = (userPayload: TivotUserPayload): string => {
     return userPayload.message
   }
 
-  return JSON.stringify({
-    user_action: userPayload.user_action,
-    problem_id: userPayload.problem_id,
-    submitted_order: userPayload.submitted_order,
-    user_comment: userPayload.user_comment ?? null,
-  })
+  const comment = userPayload.user_comment ? ` Comentario: ${userPayload.user_comment}` : ''
+  return `El estudiante ordeno los cuadros asi: ${userPayload.submitted_order.join(', ')}.${comment}`
 }
 
 const sameOrder = (validOrder: string[], submittedOrder: string[]): boolean =>

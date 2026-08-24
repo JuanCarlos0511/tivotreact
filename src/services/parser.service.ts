@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { TivotAssistantPayload } from '@shared/types'
+import { createStandardTextPayload } from '@shared/types'
 
 const metadataSchema = z.object({
   is_evaluation: z.boolean(),
@@ -34,18 +35,64 @@ const assistantPayloadSchema = z.discriminatedUnion('type', [
   }),
 ])
 
-export const parseAssistantPayload = (rawContent: string): TivotAssistantPayload | null => {
+const spanishAssistantPayloadSchema = z.object({
+  tipo: z.enum(['texto', 'flujo']),
+  mensaje: z.string().min(1),
+  cuadros: z.array(z.string().min(1)).nullable(),
+})
+
+export const parseAssistantPayload = (rawContent: string): TivotAssistantPayload => {
   const jsonSource = extractJsonObject(rawContent)
-  if (!jsonSource) return null
+  if (!jsonSource) return createFallbackPayload(rawContent)
 
   try {
     const parsed: unknown = JSON.parse(jsonSource)
     const result = assistantPayloadSchema.safeParse(parsed)
-    return result.success ? result.data : null
+    if (result.success) return result.data
+
+    const spanishResult = spanishAssistantPayloadSchema.safeParse(parsed)
+    if (spanishResult.success) return normalizeSpanishPayload(spanishResult.data)
+
+    return createFallbackPayload(rawContent)
   } catch {
-    return null
+    return createFallbackPayload(rawContent)
   }
 }
+
+const normalizeSpanishPayload = (payload: z.infer<typeof spanishAssistantPayloadSchema>): TivotAssistantPayload => {
+  if (payload.tipo === 'flujo' && payload.cuadros && payload.cuadros.length >= 4) {
+    return {
+      type: 'interactive_flow',
+      problem_id: 'generated-pos-flow',
+      message: payload.mensaje,
+      flow_data: {
+        instruction: 'Ordena los pasos del punto de venta.',
+        nodes: payload.cuadros.slice(0, 4).map((label, index) => ({
+          id: `n${index + 1}`,
+          label,
+        })),
+      },
+      metadata: {
+        is_evaluation: false,
+        passed: null,
+        concept: 'Fundamentos POS',
+      },
+    }
+  }
+
+  return createStandardTextPayload(payload.mensaje, {
+    is_evaluation: false,
+    passed: null,
+    concept: 'Fundamentos POS',
+  })
+}
+
+const createFallbackPayload = (rawContent: string): TivotAssistantPayload =>
+  createStandardTextPayload(rawContent.trim() || 'No pude leer la respuesta. Probemos con un ejemplo POS sencillo.', {
+    is_evaluation: false,
+    passed: null,
+    concept: 'Fundamentos POS',
+  })
 
 const extractJsonObject = (rawContent: string): string | null => {
   const trimmed = rawContent.trim()

@@ -1,8 +1,5 @@
-import { useEffect, useState } from 'react'
-import { KeyRound, Moon, Save, Sun } from 'lucide-react'
+import { Moon, Sun } from 'lucide-react'
 import type { ThemeMode } from '@/theme/theme'
-import type { AiProviderName } from '@services/storage.service'
-import { getAiRuntimeSettings, saveAiRuntimeSettings } from '@services/storage.service'
 
 interface SettingsModalProps {
   theme: ThemeMode
@@ -11,27 +8,6 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ theme, onThemeChange, onClose }: SettingsModalProps) {
-  const [aiProvider, setAiProvider] = useState<AiProviderName>('mock')
-  const [apiKey, setApiKey] = useState('')
-
-  useEffect(() => {
-    const settings = getAiRuntimeSettings()
-    if (!settings) return
-
-    setAiProvider(settings.provider)
-    setApiKey(settings.apiKey)
-  }, [])
-
-  const saveSettings = () => {
-    saveAiRuntimeSettings({
-      provider: aiProvider,
-      apiKey,
-    })
-    onClose()
-  }
-
-  const shouldShowApiKey = aiProvider === 'gemini' || aiProvider === 'openai'
-
   return (
     <>
       <button className="modal-backdrop" aria-label="Cerrar configuracion" onClick={onClose} type="button" />
@@ -62,40 +38,6 @@ export function SettingsModal({ theme, onThemeChange, onClose }: SettingsModalPr
             </button>
           </div>
         </div>
-        <div className="settings-row settings-row-stacked">
-          <span className="settings-row-label">Motor IA</span>
-          <div className="provider-switch" aria-label="Motor IA">
-            {(['mock', 'ollama', 'gemini', 'openai'] as AiProviderName[]).map((provider) => (
-              <button
-                key={provider}
-                className={`theme-option ${aiProvider === provider ? 'active' : ''}`}
-                type="button"
-                onClick={() => setAiProvider(provider)}
-              >
-                <span>{provider}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        {shouldShowApiKey && (
-          <label className="settings-field">
-            <span className="settings-row-label">API key</span>
-            <span className="settings-input-shell">
-              <KeyRound size={15} />
-              <input
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-                type="password"
-                placeholder="sk-..."
-                autoComplete="off"
-              />
-            </span>
-          </label>
-        )}
-        <button className="settings-save-button" type="button" onClick={saveSettings}>
-          <Save size={15} />
-          <span>Guardar</span>
-        </button>
       </section>
     </>
   )

@@ -50,7 +50,7 @@ export function ChatWorkspace({
           <header className="conversation-header">
             <div>
               <p className="conversation-eyebrow">Tivot</p>
-              <h1>{session?.title ?? 'Nueva mision'}</h1>
+              <h1>{session?.title ?? 'Nueva conversacion'}</h1>
             </div>
           </header>
         ) : (
@@ -65,7 +65,7 @@ export function ChatWorkspace({
               <article className="message-row message-row-assistant">
                 <div className="message-bubble assistant-message message-loading">
                   <Loader2 className="spin" size={16} />
-                  <span>Pensando una pista</span>
+            <span>Pensando respuesta</span>
                 </div>
               </article>
             )}
@@ -77,7 +77,7 @@ export function ChatWorkspace({
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Escribe una mision para tu robot..."
+            placeholder="Escribe tu duda de programacion..."
             rows={2}
           />
           <button

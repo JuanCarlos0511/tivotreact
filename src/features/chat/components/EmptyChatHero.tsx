@@ -17,9 +17,9 @@ export function EmptyChatHero({ onSelectStarterTopic }: EmptyChatHeroProps) {
   return (
     <section className="empty-chat-hero" aria-labelledby="empty-chat-title">
       <p className="empty-chat-kicker">Tivot</p>
-      <h1 id="empty-chat-title">Hola, que vamos a programar hoy?</h1>
+      <h1 id="empty-chat-title">Hola, soy Tivot</h1>
       <p className="empty-chat-subtitle">
-        Elige una mision y armamos instrucciones sencillas, como si guiaras a un robot paso a paso.
+        Soy tu tutor de programacion basica. Preguntame sobre variables, tipos de datos, IF, bucles o listas y lo vemos con ejemplos de punto de venta.
       </p>
       <div className="starter-topic-grid" aria-label="Misiones rapidas">
         {TIVOT_STARTER_TOPICS.map((topic) => {

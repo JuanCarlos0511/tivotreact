@@ -1,7 +1,7 @@
 import type { AiChatMessage, AiProvider } from '@shared/types'
 import type { AiProviderRuntimeConfig } from './ai-provider.types'
 
-interface OpenAiChatResponse {
+interface QwenChatResponse {
   choices?: Array<{
     message?: {
       content?: string
@@ -9,7 +9,7 @@ interface OpenAiChatResponse {
   }>
 }
 
-export class OpenAiAdapter implements AiProvider {
+export class QwenAdapter implements AiProvider {
   constructor(private readonly config: AiProviderRuntimeConfig) {}
 
   async complete(prompt: string, messages: AiChatMessage[] = [{ role: 'user', content: prompt }]): Promise<string> {
@@ -21,7 +21,7 @@ export class OpenAiAdapter implements AiProvider {
       },
       body: JSON.stringify({
         model: this.config.modelName,
-        temperature: this.config.temperature,
+        temperature: 0.4,
         response_format: { type: 'json_object' },
         messages,
       }),
@@ -29,14 +29,14 @@ export class OpenAiAdapter implements AiProvider {
     })
 
     if (!response.ok) {
-      throw new Error(`OpenAI request failed with status ${response.status}`)
+      throw new Error(`Qwen request failed with status ${response.status}`)
     }
 
-    const data: OpenAiChatResponse = await response.json()
+    const data: QwenChatResponse = await response.json()
     const text = data.choices?.[0]?.message?.content?.trim()
 
     if (!text) {
-      throw new Error('OpenAI response did not include text')
+      throw new Error('Qwen response did not include text')
     }
 
     return text

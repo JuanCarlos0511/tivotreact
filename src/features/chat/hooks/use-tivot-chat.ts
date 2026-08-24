@@ -93,16 +93,10 @@ const appendStarterTurn = (
 const createInitialSessions = (): TivotChatSession[] => [
   {
     id: 'new-chat',
-    title: 'Nueva mision',
+    title: 'Nueva conversacion',
     context: createEmptyTivotConversationContext(),
     messages: [],
   },
-  ...TIVOT_PROBLEM_CATALOG.map((problem) => ({
-    id: problem.problem_id,
-    title: problem.title,
-    context: createEmptyTivotConversationContext(problem.problem_id),
-    messages: [createAssistantMessage(createPayloadFromProblem(problem))],
-  })),
 ]
 
 export const useTivotChat = () => {
@@ -121,7 +115,7 @@ export const useTivotChat = () => {
 
     const newSession: TivotChatSession = {
       id,
-      title: 'Nueva mision',
+      title: 'Nueva conversacion',
       context: createEmptyTivotConversationContext(),
       messages: [],
     }

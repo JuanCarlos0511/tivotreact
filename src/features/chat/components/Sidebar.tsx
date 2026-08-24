@@ -57,7 +57,7 @@ export function Sidebar({
         </div>
         <button className="new-chat-button" onClick={onCreateChat} type="button">
           <MessageSquarePlus size={16} />
-          <span>Nueva mision</span>
+          <span>Nueva conversacion</span>
         </button>
       </div>
       <div className="history-heading">Recientes</div>

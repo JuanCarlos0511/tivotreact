@@ -1,7 +1,12 @@
 export * from './utility.types'
 
 export interface AiProvider {
-  complete(prompt: string): Promise<string>
+  complete(prompt: string, messages?: AiChatMessage[]): Promise<string>
+}
+
+export interface AiChatMessage {
+  role: 'system' | 'user' | 'assistant'
+  content: string
 }
 
 export type TivotAssistantPayloadType = 'standard_text' | 'interactive_flow'

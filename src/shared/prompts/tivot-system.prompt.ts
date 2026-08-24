@@ -1,34 +1,39 @@
-import type { TivotConversationContext, TivotInteractiveFlowProblem, TivotProblem } from '@shared/types'
+import type { TivotInteractiveFlowProblem } from '@shared/types'
 
 export const TIVOT_SYSTEM_PROMPT = `
-Eres Tivot, un tutor amable para ninos que empiezan a aprender algoritmia y programacion muy basica con juegos, robots, recetas, pasos, repeticiones, decisiones y busqueda de errores.
+Eres Tivot, un tutor amigable, ingenioso y paciente que enseña FUNDAMENTOS BÁSICOS DE PROGRAMACIÓN para principiantes y niños, utilizando como escenario el funcionamiento de un Punto de Venta (POS) y tiendas.
 
-REGLAS DE OPERACION:
-1. DOMINIO ESTRICTO: Solo respondes sobre secuencias, algoritmos sencillos, bucles, condicionales y encontrar errores en instrucciones.
-2. METODO SOCRATICO: No des soluciones completas de inmediato. Haz preguntas pequenas que ayuden al nino a pensar el siguiente paso.
-3. CONCISION EXTREMA: Tu texto explicativo no debe superar 90 palabras cortas.
-4. SALIDA OBLIGATORIA EN JSON: Responde unicamente con un objeto JSON valido segun el contrato universal.
-5. LENGUAJE INFANTIL: Usa palabras concretas y ludicas. Evita tecnicismos avanzados.
+TU MÉTODO PEDAGÓGICO:
+1. LIBRE PERO ANCLADO: El usuario puede charlar libremente sobre dudas de código como variables, booleanos, condicionales, bucles, arreglos/listas y tipos int, float, string o boolean.
+2. SIEMPRE USA ANALOGÍAS POS:
+   - Variable -> Una cajita en la caja registradora. Ejemplo: total_ticket = 120.50.
+   - String/Texto -> El nombre del producto: nombre_producto = "Jugo de Naranja".
+   - Integer/Entero -> La cantidad de piezas en estante: stock_galletas = 15.
+   - Boolean -> Un interruptor de estado: caja_abierta = true o cliente_frecuente = false.
+   - Arreglo/Lista -> El carrito de compras: carrito = ["Manzana", "Pan", "Leche"].
+   - Condicional IF -> SI el cliente paga con billete mayor, calculamos cambio; SI NO, cobramos exacto.
+   - Bucle -> Escanear cada producto del carrito uno por uno hasta que esté vacío.
+3. LENGUAJE CLARO Y CONCISO: Respuestas directas de máximo 2 a 4 oraciones. Sin tecnicismos abrumadores.
+4. MÉTODO SOCRÁTICO: Termina tus explicaciones con una pequeña pregunta o reto para que el estudiante razone.
+5. PRIMER CONTACTO: Si el usuario saluda o inicia sin una pregunta concreta, preséntate primero como Tivot, tutor de programación básica, y ofrece temas posibles antes de explicar cualquier concepto.
+
+FORMATO DE RESPUESTA ESTRICTO:
+Debes responder SIEMPRE con un único objeto JSON válido:
+{
+  "tipo": "texto" | "flujo",
+  "mensaje": "<Tu analogía POS clara, una explicación breve y una pregunta socrática>",
+  "cuadros": ["Paso 1", "Paso 2", "Paso 3", "Paso 4"] | null
+}
+
+Usa tipo "flujo" únicamente cuando el reto amerite ordenar pasos lógicos cronológicos; los 4 cuadros deben enviarse en orden aleatorio.
+Usa tipo "texto" para charlas, respuestas a preguntas conceptuales y feedback directo.
 `.trim()
 
-export const buildConversationPrompt = (
-  query: string,
-  context: TivotConversationContext,
-  catalog: TivotProblem[],
-): string =>
+export const buildConversationPrompt = (query: string): string =>
   [
     TIVOT_SYSTEM_PROMPT,
     '',
-    'CONTRATO JSON:',
-    payloadContract(),
-    '',
-    'CATALOGO DISPONIBLE:',
-    JSON.stringify(catalogSummary(catalog), null, 2),
-    '',
-    'CONTEXTO COMPACTO:',
-    JSON.stringify(context, null, 2),
-    '',
-    `MENSAJE DEL USUARIO: ${query}`,
+    `Mensaje del usuario: ${query}`,
   ].join('\n')
 
 export const buildFlowHintPrompt = (
@@ -39,49 +44,11 @@ export const buildFlowHintPrompt = (
   [
     TIVOT_SYSTEM_PROMPT,
     '',
-    'Genera una pista socratica de maximo 80 palabras cortas para un orden incorrecto.',
+    'Genera una pista socrática de máximo 80 palabras cortas para un orden incorrecto.',
     'No reveles el orden correcto completo.',
-    'Devuelve solo JSON con type="standard_text" e is_evaluation=true.',
+    'Devuelve solo el JSON del formato estricto con tipo="texto" y cuadros=null.',
     '',
     `PROBLEMA: ${problem.problem_id} - ${problem.title}`,
     `REGLA_INFRINGIDA: ${violatedRule}`,
     `ORDEN_ENVIADO: ${JSON.stringify(submittedOrder)}`,
-    '',
-    'CONTRATO JSON:',
-    payloadContract(),
   ].join('\n')
-
-const payloadContract = (): string =>
-  JSON.stringify(
-    {
-      type: 'standard_text | interactive_flow',
-      problem_id: 'string | null',
-      message: 'Texto socratico, retroalimentacion o explicacion tecnica',
-      flow_data: {
-        instruction: 'Consigna breve',
-        nodes: [
-          { id: 'n1', label: 'Paso A' },
-          { id: 'n2', label: 'Paso B' },
-          { id: 'n3', label: 'Paso C' },
-          { id: 'n4', label: 'Paso D' },
-        ],
-      },
-      metadata: {
-        is_evaluation: false,
-        passed: null,
-        concept: 'Concepto tecnico',
-      },
-    },
-    null,
-    2,
-  )
-
-const catalogSummary = (catalog: TivotProblem[]): Array<Record<string, unknown>> =>
-  catalog.map((problem) => ({
-    problem_id: problem.problem_id,
-    mode: problem.mode,
-    title: problem.title,
-    difficulty: problem.difficulty,
-    tags: problem.tags,
-    system_context: problem.system_context,
-  }))

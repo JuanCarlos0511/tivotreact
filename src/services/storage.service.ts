@@ -1,4 +1,4 @@
-export type AiProviderName = 'mock' | 'gemini' | 'openai' | 'ollama'
+export type AiProviderName = 'mock' | 'gemini' | 'openai' | 'ollama' | 'qwen'
 
 export interface AiRuntimeSettings {
   provider: AiProviderName
@@ -34,4 +34,4 @@ const isAiRuntimeSettings = (value: unknown): value is AiRuntimeSettings => {
 }
 
 const isProvider = (value: unknown): value is AiProviderName =>
-  value === 'mock' || value === 'gemini' || value === 'openai' || value === 'ollama'
+  value === 'mock' || value === 'gemini' || value === 'openai' || value === 'ollama' || value === 'qwen'
