@@ -90,19 +90,24 @@ const appendStarterTurn = (
   ].slice(-3),
 })
 
-const createInitialSessions = (): TivotChatSession[] =>
-  TIVOT_PROBLEM_CATALOG.map((problem) => ({
+const createInitialSessions = (): TivotChatSession[] => [
+  {
+    id: 'new-chat',
+    title: 'Nueva mision',
+    context: createEmptyTivotConversationContext(),
+    messages: [],
+  },
+  ...TIVOT_PROBLEM_CATALOG.map((problem) => ({
     id: problem.problem_id,
     title: problem.title,
     context: createEmptyTivotConversationContext(problem.problem_id),
     messages: [createAssistantMessage(createPayloadFromProblem(problem))],
-  }))
+  })),
+]
 
 export const useTivotChat = () => {
   const [sessions, setSessions] = useState<TivotChatSession[]>(() => createInitialSessions())
-  const [activeSessionId, setActiveSessionId] = useState(
-    () => TIVOT_PROBLEM_CATALOG[2]?.problem_id ?? TIVOT_PROBLEM_CATALOG[0]?.problem_id ?? 'default',
-  )
+  const [activeSessionId, setActiveSessionId] = useState(() => 'new-chat')
   const [query, setQuery] = useState('')
   const [isResponding, setIsResponding] = useState(false)
 

@@ -52,9 +52,6 @@ export function ChatWorkspace({
               <p className="conversation-eyebrow">Tivot</p>
               <h1>{session?.title ?? 'Nueva mision'}</h1>
             </div>
-            <div className="context-pill" aria-label="Turnos guardados">
-              <span>{session?.context.turns.length ?? 0}/3</span>
-            </div>
           </header>
         ) : (
           <EmptyChatHero onSelectStarterTopic={onSelectStarterTopic} />

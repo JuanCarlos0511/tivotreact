@@ -31,82 +31,82 @@ const KID_PROBLEMS_CATALOG: KidCatalogProblem[] = [
   {
     problemId: 'KID-SEQ-001',
     mode: 'interactive_flow',
-    title: 'La Mañana del Robot Bip-Bop',
+    title: 'La Caja del Kiosco',
     category: 'secuencias',
     difficulty: 'facil',
-    description: 'El robot Bip-Bop necesita tu ayuda para alistarse antes de ir a la escuela de robots.',
-    starterPrompt: '¡Ayuda a Bip-Bop a ordenar su rutina de la mañana para no salir en pijamas!',
-    evaluationCriteria: 'El usuario debe entender que una secuencia lógica sigue un orden temporal obligatorio.',
+    description: 'La caja del kiosco necesita seguir el orden correcto para abrir la venta del día.',
+    starterPrompt: '¿Qué se hace primero para que la caja empiece bien el día?',
+    evaluationCriteria: 'El usuario debe reconocer que los pasos del punto de venta deben seguir un orden correcto.',
     flowDefinition: {
-      instruction: 'Ordena las acciones que debe hacer Bip-Bop desde que se despierta:',
+      instruction: 'Ordena lo que debe pasar antes de empezar a vender:',
       nodes: [
-        { id: 's1_despertar', label: '1. Abrir los ojos y apagar la alarma' },
-        { id: 's1_lavar', label: '2. Lavarse la cara y los dientes' },
-        { id: 's1_vestir', label: '3. Ponerse el uniforme escolar' },
-        { id: 's1_desayuno', label: '4. Tomar un rico desayuno con jugo' }
+        { id: 'caja_prender', label: '1. Encender la caja' },
+        { id: 'caja_abrir', label: '2. Abrir la caja de dinero' },
+        { id: 'caja_precios', label: '3. Revisar los precios de los productos' },
+        { id: 'caja_venta', label: '4. Empezar a vender' }
       ],
       validOrders: [
-        ['s1_despertar', 's1_lavar', 's1_vestir', 's1_desayuno'],
-        ['s1_despertar', 's1_vestir', 's1_lavar', 's1_desayuno']
+        ['caja_prender', 'caja_abrir', 'caja_precios', 'caja_venta'],
+        ['caja_prender', 'caja_precios', 'caja_abrir', 'caja_venta']
       ],
       failureHints: {
-        vestir_before_despertar: '¡Ups! Bip-Bop no puede vestirse mientras sigue durmiendo.'
+        caja_abrir_before_prender: 'La caja necesita estar lista antes de abrir la caja de dinero.'
       }
     }
   },
   {
     problemId: 'KID-SEQ-002',
     mode: 'interactive_flow',
-    title: 'La Fábrica de Pizza de Don Queso',
+    title: 'La Compra del Super',
     category: 'secuencias',
     difficulty: 'facil',
-    description: 'Aprende a programar la máquina pizzera para hornear una pizza deliciosa sin quemarla.',
-    starterPrompt: '¿Cómo le ordenamos a la máquina pizzera que prepare la comida?',
-    evaluationCriteria: 'Comprender que los ingredientes se colocan antes de la cocción.',
+    description: 'Ayuda al cliente a llevar sus cosas en el orden correcto para pagar y salir feliz.',
+    starterPrompt: '¿Cómo debe ir la compra para llegar bien a la caja?',
+    evaluationCriteria: 'Comprender que cada paso de la compra tiene un orden para no confundir al cliente.',
     flowDefinition: {
-      instruction: 'Arrastra los pasos para preparar la pizza en el orden correcto:',
+      instruction: 'Ordena los pasos de una compra sencilla:',
       nodes: [
-        { id: 'pza_masa', label: 'Amasar y estirar la masa redonda' },
-        { id: 'pza_salsa', label: 'Esparcir la salsa de tomate y queso' },
-        { id: 'pza_horno', label: 'Meter al horno caliente por 10 minutos' },
-        { id: 'pza_servir', label: 'Cortar en rebanadas y servir en el plato' }
+        { id: 'compra_tomar', label: 'Tomar los productos que quiere el cliente' },
+        { id: 'compra_mirar', label: 'Mirar el precio de cada uno' },
+        { id: 'compra_caja', label: 'Poner todo en la caja' },
+        { id: 'compra_pagar', label: 'Pagar y guardar la bolsa' }
       ],
       validOrders: [
-        ['pza_masa', 'pza_salsa', 'pza_horno', 'pza_servir']
+        ['compra_tomar', 'compra_mirar', 'compra_caja', 'compra_pagar']
       ]
     }
   },
   {
     problemId: 'KID-SEQ-003',
     mode: 'interactive_flow',
-    title: 'Misión Espacial: ¡Despegue!',
+    title: 'La Tienda de Juguetes',
     category: 'secuencias',
     difficulty: 'medio',
-    description: 'La nave Titán 3 va rumbo a Marte. Diseña la secuencia de despegue segura.',
-    starterPrompt: '¡El astronauta necesita tu código de secuencia para encender los motores!',
-    evaluationCriteria: 'Asegurar que la seguridad (cinturón/puertas) ocurra antes del encendido de propulsores.',
+    description: 'La tienda tiene que atender bien a cada cliente para que no se pierda ninguna compra.',
+    starterPrompt: '¿Qué pasa primero cuando llega un cliente a la tienda?',
+    evaluationCriteria: 'Reconocer que mirar, preparar y pagar son pasos que se siguen en orden.',
     flowDefinition: {
-      instruction: 'Programa el orden de comandos para la computadora del cohete:',
+      instruction: 'Ordena la forma de atender a un cliente:',
       nodes: [
-        { id: 'nav_entrar', label: 'Astronautas entran a la cabina' },
-        { id: 'nav_seguro', label: 'Cerrar compuertas y ajustar cinturones' },
-        { id: 'nav_conteo', label: 'Cuenta regresiva: 3, 2, 1...' },
-        { id: 'nav_fuego', label: '¡Encender propulsores hacia el espacio!' }
+        { id: 'tienda_llega', label: 'El cliente llega a la tienda' },
+        { id: 'tienda_elige', label: 'Elige los juguetes que quiere' },
+        { id: 'tienda_caja', label: 'Pasa por la caja' },
+        { id: 'tienda_pago', label: 'Recibe su bolsa y su cambio' }
       ],
       validOrders: [
-        ['nav_entrar', 'nav_seguro', 'nav_conteo', 'nav_fuego']
+        ['tienda_llega', 'tienda_elige', 'tienda_caja', 'tienda_pago']
       ]
     }
   },
   {
     problemId: 'KID-SEQ-004',
     mode: 'standard_text',
-    title: 'Instrucciones para un Marcianito',
+    title: 'La Receta de la Venta',
     category: 'secuencias',
     difficulty: 'facil',
-    description: 'Llegó un marcianito que no sabe lavarse las manos con jabón. Explícaselo como a una computadora.',
-    starterPrompt: 'Imagina que un marcianito nunca ha visto agua ni jabón. ¿Qué 3 o 4 pasos exactos le dirías para lavarse las manos?',
-    evaluationCriteria: 'El infante debe descomponer una tarea cotidiana en pasos atómicos y ordenados.'
+    description: 'Un niño quiere ayudar a una tienda, pero necesita explicar bien los pasos de una venta sencilla.',
+    starterPrompt: '¿Qué 3 o 4 pasos seguirías para vender una fruta a un cliente?',
+    evaluationCriteria: 'El niño debe separar la venta en pasos claros y ordenados, desde mirar hasta pagar.'
   },
 
   // ==========================================
@@ -115,56 +115,56 @@ const KID_PROBLEMS_CATALOG: KidCatalogProblem[] = [
   {
     problemId: 'KID-LUP-001',
     mode: 'interactive_flow',
-    title: 'El Baile de la Ranita Saltarína',
+    title: 'La Fila de la Panadería',
     category: 'bucles',
     difficulty: 'facil',
-    description: 'Usa un bucle para programar los pasos de baile de la ranita sin repetir código muchas veces.',
-    starterPrompt: '¿Cómo le decimos a la ranita que haga una coreografía repetida?',
-    evaluationCriteria: 'Identificar el bloque contenedor o la acción de repetición al final del ciclo.',
+    description: 'La panadería repite el mismo paso muchas veces para atender a todos los clientes.',
+    starterPrompt: '¿Cómo hace la panadería para atender a varias personas sin cansarse?',
+    evaluationCriteria: 'Entender que repetir un paso ayuda a hacer la misma tarea muchas veces.',
     flowDefinition: {
-      instruction: 'Ordena los pasos para que la ranita complete una vuelta de baile:',
+      instruction: 'Ordena la rutina de la panadería:',
       nodes: [
-        { id: 'rn_salto', label: 'Dar un salto alto al frente' },
-        { id: 'rn_giro', label: 'Girar hacia la derecha' },
-        { id: 'rn_aplauso', label: 'Aplaudiendo con las ancas' },
-        { id: 'rn_repetir', label: 'Repetir todo 4 veces' }
+        { id: 'pan_mira', label: 'Mirar lo que quiere cada cliente' },
+        { id: 'pan_poner', label: 'Poner el pan en la bolsa' },
+        { id: 'pan_cobrar', label: 'Cobrar el dinero' },
+        { id: 'pan_repetir', label: 'Repetir todo con el siguiente cliente' }
       ],
       validOrders: [
-        ['rn_salto', 'rn_giro', 'rn_aplauso', 'rn_repetir']
+        ['pan_mira', 'pan_poner', 'pan_cobrar', 'pan_repetir']
       ]
     }
   },
   {
     problemId: 'KID-LUP-002',
     mode: 'interactive_flow',
-    title: 'Recolectando Monedas del Dragón',
+    title: 'Las Bolas de Dulce',
     category: 'bucles',
     difficulty: 'medio',
-    description: 'El robot explorador debe recoger 5 monedas brillantes del sendero.',
-    starterPrompt: '¡Vamos a llenar la alcancía! Diseña el bucle de recolección.',
-    evaluationCriteria: 'Entender que el avance y la recolección forman el cuerpo del bucle antes de la condición de parada.',
+    description: 'La caja necesita contar varias bolsitas dulces para que cada cliente salga con lo que pidió.',
+    starterPrompt: '¿Cómo le decimos a la caja que haga lo mismo varias veces?',
+    evaluationCriteria: 'Entender que la misma tarea se repite hasta terminar la compra.',
     flowDefinition: {
-      instruction: 'Arma el algoritmo para recolectar monedas una por una:',
+      instruction: 'Arma la rutina para guardar varios dulces:',
       nodes: [
-        { id: 'drg_camina', label: 'Avanzar 1 paso hacia la moneda' },
-        { id: 'drg_toma', label: 'Tomar la moneda del suelo' },
-        { id: 'drg_guarda', label: 'Guardar la moneda en la bolsa' },
-        { id: 'drg_checa', label: '¿Hay más monedas? Si hay, volver a empezar' }
+        { id: 'dulce_toma', label: 'Tomar una bolsita de dulce' },
+        { id: 'dulce_pesa', label: 'Pesarla o revisarla' },
+        { id: 'dulce_pone', label: 'Ponerla en la bolsa' },
+        { id: 'dulce_vuelve', label: 'Si falta más, volver a empezar' }
       ],
       validOrders: [
-        ['drg_camina', 'drg_toma', 'drg_guarda', 'drg_checa']
+        ['dulce_toma', 'dulce_pesa', 'dulce_pone', 'dulce_vuelve']
       ]
     }
   },
   {
     problemId: 'KID-LUP-003',
     mode: 'standard_text',
-    title: 'El Bucle Infinito del Gatito Miau',
+    title: 'El Moño de la Caja',
     category: 'bucles',
     difficulty: 'facil',
-    description: 'Un gatito programado para perseguir su cola no para nunca porque olvidamos la condición de alto.',
-    starterPrompt: 'Si le dices a un robot "Come galletas, Come galletas, Come galletas..." sin decirle cuándo detenerse, ¿qué problema ocurre en su sistema?',
-    evaluationCriteria: 'El niño debe reconocer la noción de bucle infinito y la necesidad de una condición de salida.'
+    description: 'La caja sigue repitiendo la misma acción sin parar y nadie sabe cuándo dejar de contar.',
+    starterPrompt: 'Si la caja dice: “sumar, sumar, sumar...” sin decir cuándo parar, ¿qué pasa?',
+    evaluationCriteria: 'El niño debe reconocer que hace falta una señal para terminar la repetición.'
   },
 
   // ==========================================
@@ -173,58 +173,58 @@ const KID_PROBLEMS_CATALOG: KidCatalogProblem[] = [
   {
     problemId: 'KID-CND-001',
     mode: 'interactive_flow',
-    title: 'El Semáforo Inteligente',
+    title: 'La Tienda con Luz',
     category: 'condicionales',
     difficulty: 'facil',
-    description: 'Programa los sensores de un coche autónomo de juguete para cruzar la calle seguro.',
-    starterPrompt: '¡El coche necesita tomar decisiones según la luz del semáforo!',
-    evaluationCriteria: 'Comprender la relación entre condición (sensor/luz) y la acción consecuente.',
+    description: 'La caja necesita decidir qué hacer según lo que trae el cliente.',
+    starterPrompt: '¿Qué hace la caja cuando el cliente paga con tarjeta o con dinero?',
+    evaluationCriteria: 'Comprender que la decisión cambia según lo que ocurre en la compra.',
     flowDefinition: {
-      instruction: 'Ordena la lógica de decisión del coche:',
+      instruction: 'Ordena la elección de la caja:',
       nodes: [
-        { id: 'sm_mira', label: 'Escanear el color de la luz del semáforo' },
-        { id: 'sm_verde', label: 'SI la luz es VERDE: Acelerar y avanzar' },
-        { id: 'sm_rojo', label: 'SI la luz es ROJA: Frenar por completo' },
-        { id: 'sm_espera', label: 'Esperar hasta el siguiente cambio de luz' }
+        { id: 'luz_mira', label: 'Mirar cómo paga el cliente' },
+        { id: 'luz_tarjeta', label: 'Si paga con tarjeta: pasar la tarjeta' },
+        { id: 'luz_dinero', label: 'Si paga con dinero: contar el cambio' },
+        { id: 'luz_fin', label: 'Dar el recibo y la bolsa' }
       ],
       validOrders: [
-        ['sm_mira', 'sm_verde', 'sm_rojo', 'sm_espera'],
-        ['sm_mira', 'sm_rojo', 'sm_verde', 'sm_espera']
+        ['luz_mira', 'luz_tarjeta', 'luz_dinero', 'luz_fin'],
+        ['luz_mira', 'luz_dinero', 'luz_tarjeta', 'luz_fin']
       ]
     }
   },
   {
     problemId: 'KID-CND-002',
     mode: 'interactive_flow',
-    title: 'La Puerta del Castillo Encantado',
+    title: 'La Puerta de la Tienda',
     category: 'condicionales',
     difficulty: 'medio',
-    description: 'Para entrar al castillo, el caballero robot debe validar si tiene la llave dorada.',
-    starterPrompt: '¿Cómo decide la puerta mágica si se abre o se queda con cerrojo?',
-    evaluationCriteria: 'Entender la estructura de bifurcación SI / SI NO.',
+    description: 'La puerta de la tienda sabe si debe abrirse o no según lo que lleve el cliente.',
+    starterPrompt: '¿Cómo decide la tienda si abre la puerta o manda a esperar?',
+    evaluationCriteria: 'Entender que una decisión puede cambiar según una pregunta simple.',
     flowDefinition: {
-      instruction: 'Ordena el proceso de decisión de la puerta mágica:',
+      instruction: 'Ordena la decisión de la puerta de la tienda:',
       nodes: [
-        { id: 'cst_sensor', label: 'Sensor revisa la mano del caballero' },
-        { id: 'cst_si', label: 'SI tiene la Llave Dorada: Abrir el puente levadizo' },
-        { id: 'cst_sino', label: 'SI NO la tiene: Mostrar mensaje "Busca la llave"' },
-        { id: 'cst_fin', label: 'Registrar al visitante en el libro del reino' }
+        { id: 'puerta_mira', label: 'Mirar lo que trae el cliente' },
+        { id: 'puerta_si', label: 'Si tiene la bolsa: dejar pasar' },
+        { id: 'puerta_no', label: 'Si no la tiene: decirle que espere' },
+        { id: 'puerta_fin', label: 'Guardar la entrada del día' }
       ],
       validOrders: [
-        ['cst_sensor', 'cst_si', 'cst_sino', 'cst_fin'],
-        ['cst_sensor', 'cst_sino', 'cst_si', 'cst_fin']
+        ['puerta_mira', 'puerta_si', 'puerta_no', 'puerta_fin'],
+        ['puerta_mira', 'puerta_no', 'puerta_si', 'puerta_fin']
       ]
     }
   },
   {
     problemId: 'KID-CND-003',
     mode: 'standard_text',
-    title: 'El Guardarropa del Pingüino Pepe',
+    title: 'La Ropa del Clima',
     category: 'condicionales',
     difficulty: 'facil',
-    description: 'Pepe vive en una isla de clima loco. Ayúdalo a decidir su ropa con reglas lógicas.',
-    starterPrompt: 'Crea una regla con "SI... ENTONCES... SI NO..." para que Pepe decida si llevar paraguas o ponerse lentes de sol hoy.',
-    evaluationCriteria: 'Formular una condición lógica válida con causa y efecto directo.'
+    description: 'La tienda quiere ayudar al cliente a decidir qué llevar según el día.',
+    starterPrompt: 'Crea una regla sencilla con “SI… ENTONCES… SI NO…” para elegir si llevar sombrero o paraguas.',
+    evaluationCriteria: 'Formular una decisión simple con un motivo claro y un resultado claro.'
   },
 
   // ==========================================
@@ -233,56 +233,56 @@ const KID_PROBLEMS_CATALOG: KidCatalogProblem[] = [
   {
     problemId: 'KID-BUG-001',
     mode: 'interactive_flow',
-    title: 'El Robot con Zapatos al Revés',
+    title: 'Los Zapatos de la Caja',
     category: 'depuracion',
     difficulty: 'facil',
-    description: 'El robot tuvo un error de código y se puso los zapatos antes de las medias. ¡Arrégla el bug!',
-    starterPrompt: '¡Hay un bug gracioso en los pies del robot! Arreglemos el orden.',
-    evaluationCriteria: 'Identificar precondiciones indispensables en una secuencia.',
+    description: 'La caja hizo el orden al revés y ahora el cliente se va confundido.',
+    starterPrompt: '¡Hay un error en la caja! ¿Qué orden debe seguir?',
+    evaluationCriteria: 'Identificar el orden correcto de los pasos antes de entregar la compra.',
     flowDefinition: {
-      instruction: 'Ordena los bloques correctamente para quitar el error:',
+      instruction: 'Ordena bien los pasos para arreglar la venta:',
       nodes: [
-        { id: 'bg_pie', label: 'Destapar el pie limpio' },
-        { id: 'bg_media', label: 'Poner la media de lana' },
-        { id: 'bg_zapato', label: 'Meter el pie en el zapato' },
-        { id: 'bg_amarrar', label: 'Atar los cordones con un nudo' }
+        { id: 'bug_peso', label: 'Pesar la compra' },
+        { id: 'bug_caja', label: 'Ponerla en la caja' },
+        { id: 'bug_pago', label: 'Cobrar el total' },
+        { id: 'bug_bolsa', label: 'Dar la bolsa al cliente' }
       ],
       validOrders: [
-        ['bg_pie', 'bg_media', 'bg_zapato', 'bg_amarrar']
+        ['bug_peso', 'bug_caja', 'bug_pago', 'bug_bolsa']
       ]
     }
   },
   {
     problemId: 'KID-BUG-002',
     mode: 'interactive_flow',
-    title: 'El Choque contra la Muralla',
+    title: 'El Cambio Equivocado',
     category: 'depuracion',
     difficulty: 'medio',
-    description: 'El coche de carreras se estrella porque gira después de avanzar demasiado. Corrige su trayectoria.',
-    starterPrompt: '¡El coche chocó con el muro de llantas! ¿En qué momento debió girar?',
-    evaluationCriteria: 'Ajustar el orden cronológico de eventos para evitar una colisión.',
+    description: 'La cajera contó mal el cambio y ahora el cliente está triste.',
+    starterPrompt: '¿En qué momento se debía contar bien el cambio?',
+    evaluationCriteria: 'Ajustar el orden de la venta para que el cambio salga bien.',
     flowDefinition: {
-      instruction: 'Corrige la ruta del coche para que pase por la curva segura:',
+      instruction: 'Corrige la secuencia para dar el cambio bien:',
       nodes: [
-        { id: 'bg_avanza', label: 'Avanzar 3 metros en línea recta' },
-        { id: 'bg_frena', label: 'Disminuir la velocidad antes de la curva' },
-        { id: 'bg_gira', label: 'Girar el volante hacia la izquierda' },
-        { id: 'bg_recta', label: 'Acelerar por la nueva pista despejada' }
+        { id: 'cambio_total', label: 'Ver el total de la compra' },
+        { id: 'cambio_pago', label: 'Recibir el dinero del cliente' },
+        { id: 'cambio_rest', label: 'Contar cuánto falta o sobra' },
+        { id: 'cambio_dar', label: 'Dar el cambio y la bolsa' }
       ],
       validOrders: [
-        ['bg_avanza', 'bg_frena', 'bg_gira', 'bg_recta']
+        ['cambio_total', 'cambio_pago', 'cambio_rest', 'cambio_dar']
       ]
     }
   },
   {
     problemId: 'KID-BUG-003',
     mode: 'standard_text',
-    title: 'El Sándwich Invertido',
+    title: 'La Bolsa Al Revés',
     category: 'depuracion',
     difficulty: 'facil',
-    description: 'Un robot chef sirvió un sándwich con los dos panes en el medio y el queso y tomate por fuera.',
-    starterPrompt: 'El robot chef puso: Queso -> Pan -> Pan -> Tomate. ¿Cuál fue su error y cómo debería ser el código correcto?',
-    evaluationCriteria: 'Identificar el desorden en la estructura envolvente de los datos (capas de pan).'
+    description: 'La ayudante de la tienda puso la fruta en la bolsa al revés y ahora está toda mezclada.',
+    starterPrompt: 'La ayudante puso: “fruta, pan, pan, fruta”. ¿Qué error hizo y cómo debe ir?',
+    evaluationCriteria: 'Reconocer que el orden de los productos debe seguir la lista correcta.'
   },
 
   // ==========================================
@@ -291,34 +291,34 @@ const KID_PROBLEMS_CATALOG: KidCatalogProblem[] = [
   {
     problemId: 'KID-VAR-001',
     mode: 'interactive_flow',
-    title: 'El Marcador de Estrellas del Videojuego',
+    title: 'La Cajita del Total',
     category: 'variables',
     difficulty: 'medio',
-    description: 'Aprende cómo funciona una variable de puntaje cuando recolectas premios.',
-    starterPrompt: '¡Vamos a programar el marcador de puntos de tu propio videojuego!',
-    evaluationCriteria: 'Comprender la inicialización en cero, incremento por evento y renderizado en pantalla.',
+    description: 'La tienda guarda el total de la venta en una cajita para saber cuánto se debe cobrar.',
+    starterPrompt: '¡Vamos a guardar el total de la compra en una cajita del sistema!',
+    evaluationCriteria: 'Entender que la cajita empieza en cero, suma el valor y muestra el total final.',
     flowDefinition: {
-      instruction: 'Ordena cómo cambia el valor de la cajita mágica "PUNTOS":',
+      instruction: 'Ordena cómo cambia la cajita del total:',
       nodes: [
-        { id: 'vr_cero', label: 'Crear cajita "Puntos" con valor = 0' },
-        { id: 'vr_estrella', label: 'El jugador toca una estrella brillante' },
-        { id: 'vr_suma', label: 'Sumar +10 al número dentro de "Puntos"' },
-        { id: 'vr_pantalla', label: 'Mostrar nuevo puntaje en la pantalla' }
+        { id: 'total_cero', label: 'Crear la cajita del total con valor 0' },
+        { id: 'total_venta', label: 'Un cliente compra un producto' },
+        { id: 'total_suma', label: 'Sumar el precio al total' },
+        { id: 'total_ver', label: 'Mostrar el total en la pantalla' }
       ],
       validOrders: [
-        ['vr_cero', 'vr_estrella', 'vr_suma', 'vr_pantalla']
+        ['total_cero', 'total_venta', 'total_suma', 'total_ver']
       ]
     }
   },
   {
     problemId: 'KID-VAR-002',
     mode: 'standard_text',
-    title: 'La Mochila de Objetos Mágicos',
+    title: 'La Mochila de la Tienda',
     category: 'variables',
     difficulty: 'facil',
-    description: 'Imagina una variable como una cajita con una etiqueta donde solo cabe una cosa a la vez.',
-    starterPrompt: 'Si tenemos una cajita llamada "Mascota" y guardamos "Perro", pero luego metemos "Gato"... ¿qué animal queda dentro de la cajita al final?',
-    evaluationCriteria: 'El niño debe entender que asignar un nuevo valor a una variable sobreescribe el dato previo.'
+    description: 'La mochila guarda un nombre y luego cambia por otro, porque la tienda solo puede guardar uno a la vez.',
+    starterPrompt: 'Si la mochila dice “manzana” y luego cambia a “pan”, ¿qué nombre queda al final?',
+    evaluationCriteria: 'Entender que guardar un nuevo valor reemplaza el anterior.'
   }
 ];
 
