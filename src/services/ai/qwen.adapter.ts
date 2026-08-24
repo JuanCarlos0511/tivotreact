@@ -13,6 +13,10 @@ export class QwenAdapter implements AiProvider {
   constructor(private readonly config: AiProviderRuntimeConfig) {}
 
   async complete(prompt: string, messages: ChatContextMessage[] = [{ role: 'user', content: prompt }]): Promise<string> {
+    if (!this.config.apiKey) {
+      throw new Error('No se encontró VITE_QWEN_API_KEY en las variables de entorno.')
+    }
+
     const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -29,7 +33,8 @@ export class QwenAdapter implements AiProvider {
     })
 
     if (!response.ok) {
-      throw new Error(`Qwen request failed with status ${response.status}`)
+      const errorData = await response.text()
+      throw new Error(`Error en Qwen API (${response.status}): ${errorData}`)
     }
 
     const data: QwenChatResponse = await response.json()

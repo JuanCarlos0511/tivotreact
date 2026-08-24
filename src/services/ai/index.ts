@@ -1,6 +1,5 @@
 export * from './ai-provider.factory'
 export * from './gemini.adapter'
-export * from './mock-tivot.adapter'
 export * from './ollama.adapter'
 export * from './openai.adapter'
 export * from './qwen.adapter'
