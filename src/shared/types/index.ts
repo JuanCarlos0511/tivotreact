@@ -31,6 +31,7 @@ interface TivotAssistantPayloadBase {
   type: TivotAssistantPayloadType
   problem_id: string | null
   message: string
+  options: string[] | null
   flow_data: TivotFlowData | null
   metadata: TivotPayloadMetadata
 }
@@ -66,10 +67,12 @@ export const createStandardTextPayload = (
   message: string,
   metadata: TivotPayloadMetadata,
   problemId: string | null = null,
+  options: string[] | null = null,
 ): TivotStandardTextPayload => ({
   type: 'standard_text',
   problem_id: problemId,
   message,
+  options,
   flow_data: null,
   metadata,
 })

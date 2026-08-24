@@ -41,8 +41,11 @@ function App() {
         isResponding={chat.isResponding}
         onQueryChange={chat.setQuery}
         onSubmitMessage={chat.submitMessage}
+        onSelectQuickReply={chat.submitQuickReply}
         onSubmitFlowOrder={chat.submitFlowOrder}
         onSelectStarterTopic={chat.handleSelectStarterTopic}
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={() => setIsSidebarOpen((current) => !current)}
       />
     </main>
   )

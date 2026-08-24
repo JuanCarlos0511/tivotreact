@@ -30,6 +30,7 @@ const createPayloadFromProblem = (problem: TivotProblem): TivotAssistantPayload 
       type: 'interactive_flow',
       problem_id: problem.problem_id,
       message: problem.system_context,
+      options: null,
       flow_data: {
         instruction: problem.flow_definition.instruction,
         nodes: rotateNodes(problem.flow_definition.nodes),
@@ -67,6 +68,15 @@ const createUserMessage = (content: string) => ({
   content,
   createdAt: new Date().toISOString(),
 })
+
+const createSessionTitle = (prompt: string): string => {
+  const normalizedPrompt = prompt.trim().toLowerCase()
+  if (/^(hola|hello|hi|buenas|hey)[!.?¡¿\s]*$/.test(normalizedPrompt)) {
+    return 'Conversacion con Tivot'
+  }
+
+  return prompt.slice(0, 48)
+}
 
 const appendStarterTurn = (
   context: TivotConversationContext,
@@ -132,6 +142,11 @@ export const useTivotChat = () => {
     await submitPrompt(trimmedQuery)
   }
 
+  const submitQuickReply = async (optionText: string) => {
+    if (!activeSession || isResponding) return
+    await submitPrompt(optionText)
+  }
+
   const handleSelectStarterTopic = async (prompt: string, problemId?: string) => {
     if (!activeSession || isResponding) return
 
@@ -169,13 +184,14 @@ export const useTivotChat = () => {
 
     const sessionSnapshot = activeSession
     const userMessage = createUserMessage(prompt)
+    const updatedMessages = [...sessionSnapshot.messages, userMessage]
 
     setQuery('')
     setIsResponding(true)
     setSessions((currentSessions) =>
       currentSessions.map((session) =>
         session.id === sessionSnapshot.id
-          ? { ...session, messages: [...session.messages, userMessage] }
+          ? { ...session, messages: updatedMessages }
           : session,
       ),
     )
@@ -183,6 +199,7 @@ export const useTivotChat = () => {
     const response = await processTivotUserAction({
       userPayload: { user_action: 'send_message', message: prompt },
       context: sessionSnapshot.context,
+      conversationHistory: updatedMessages,
     })
 
     setSessions((currentSessions) =>
@@ -190,7 +207,7 @@ export const useTivotChat = () => {
         session.id === sessionSnapshot.id
           ? {
               ...session,
-              title: session.messages.length === 1 ? prompt.slice(0, 48) : session.title,
+              title: session.messages.length === 1 ? createSessionTitle(prompt) : session.title,
               context: response.context,
               messages: [...session.messages, createAssistantMessage(response.payload)],
             }
@@ -269,6 +286,7 @@ export const useTivotChat = () => {
     setActiveSessionId,
     setQuery,
     submitMessage,
+    submitQuickReply,
     handleSelectStarterTopic,
     createChat: startNewChat,
     startNewChat,

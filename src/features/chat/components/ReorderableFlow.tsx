@@ -13,6 +13,7 @@ interface ReorderableFlowProps {
 export function ReorderableFlow({ payload, submission, onSubmit }: ReorderableFlowProps) {
   const isSubmitting = submission?.status === 'SUBMITTING'
   const isLocked = submission?.status === 'LOCKED'
+  const isPassed = submission?.feedback?.metadata.passed === true
   const isDisabled = isSubmitting || isLocked
   const flowChallenge = useFlowChallenge({
     initialNodes: payload.flow_data.nodes,
@@ -36,6 +37,7 @@ export function ReorderableFlow({ payload, submission, onSubmit }: ReorderableFl
     const sourceNodeId = flowChallenge.draggedNodeId ?? event.dataTransfer.getData('text/plain')
     if (sourceNodeId) {
       flowChallenge.moveNodeById(sourceNodeId, targetNodeId)
+      vibrate()
     }
     flowChallenge.endDrag()
   }
@@ -46,7 +48,7 @@ export function ReorderableFlow({ payload, submission, onSubmit }: ReorderableFl
   }
 
   return (
-    <section className="flow-widget" aria-label={payload.flow_data.instruction}>
+    <section className={`flow-widget ${isPassed ? 'flow-widget-success' : ''}`} aria-label={payload.flow_data.instruction}>
       <p className="flow-instruction">{payload.flow_data.instruction}</p>
       <ol className="flow-node-list">
         {flowChallenge.nodes.map((node, index) => (
@@ -78,7 +80,10 @@ export function ReorderableFlow({ payload, submission, onSubmit }: ReorderableFl
                 aria-label="Subir paso"
                 title="Subir paso"
                 disabled={isDisabled || index === 0}
-                onClick={() => flowChallenge.moveNode(index, index - 1)}
+                onClick={() => {
+                  flowChallenge.moveNode(index, index - 1)
+                  vibrate()
+                }}
               >
                 <ArrowUp size={15} />
               </button>
@@ -88,7 +93,10 @@ export function ReorderableFlow({ payload, submission, onSubmit }: ReorderableFl
                 aria-label="Bajar paso"
                 title="Bajar paso"
                 disabled={isDisabled || index === flowChallenge.nodes.length - 1}
-                onClick={() => flowChallenge.moveNode(index, index + 1)}
+                onClick={() => {
+                  flowChallenge.moveNode(index, index + 1)
+                  vibrate()
+                }}
               >
                 <ArrowDown size={15} />
               </button>
@@ -108,4 +116,10 @@ export function ReorderableFlow({ payload, submission, onSubmit }: ReorderableFl
       )}
     </section>
   )
+}
+
+const vibrate = () => {
+  if ('vibrate' in navigator) {
+    navigator.vibrate(12)
+  }
 }

@@ -18,11 +18,18 @@ const flowDataSchema = z.object({
   nodes: z.array(flowNodeSchema).min(4),
 })
 
+const optionsSchema = z
+  .array(z.string())
+  .optional()
+  .nullable()
+  .transform((options) => cleanOptions(options))
+
 const assistantPayloadSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('standard_text'),
     problem_id: z.string().nullable(),
     message: z.string().min(1),
+    options: optionsSchema,
     flow_data: z.null(),
     metadata: metadataSchema,
   }),
@@ -30,6 +37,7 @@ const assistantPayloadSchema = z.discriminatedUnion('type', [
     type: z.literal('interactive_flow'),
     problem_id: z.string().min(1),
     message: z.string().min(1),
+    options: optionsSchema,
     flow_data: flowDataSchema,
     metadata: metadataSchema,
   }),
@@ -39,6 +47,7 @@ const spanishAssistantPayloadSchema = z.object({
   tipo: z.enum(['texto', 'flujo']),
   mensaje: z.string().min(1),
   cuadros: z.array(z.string().min(1)).nullable(),
+  opciones: optionsSchema,
 })
 
 export const parseAssistantPayload = (rawContent: string): TivotAssistantPayload => {
@@ -65,6 +74,7 @@ const normalizeSpanishPayload = (payload: z.infer<typeof spanishAssistantPayload
       type: 'interactive_flow',
       problem_id: 'generated-pos-flow',
       message: payload.mensaje,
+      options: null,
       flow_data: {
         instruction: 'Ordena los pasos del punto de venta.',
         nodes: payload.cuadros.slice(0, 4).map((label, index) => ({
@@ -84,7 +94,7 @@ const normalizeSpanishPayload = (payload: z.infer<typeof spanishAssistantPayload
     is_evaluation: false,
     passed: null,
     concept: 'Fundamentos POS',
-  })
+  }, null, payload.opciones)
 }
 
 const createFallbackPayload = (rawContent: string): TivotAssistantPayload =>
@@ -93,6 +103,17 @@ const createFallbackPayload = (rawContent: string): TivotAssistantPayload =>
     passed: null,
     concept: 'Fundamentos POS',
   })
+
+const cleanOptions = (options: string[] | null | undefined): string[] | null => {
+  if (!Array.isArray(options)) return null
+
+  const cleanedOptions = options
+    .map((option) => option.trim())
+    .filter((option, index, allOptions) => option.length > 0 && allOptions.indexOf(option) === index)
+    .slice(0, 4)
+
+  return cleanedOptions.length > 0 ? cleanedOptions : null
+}
 
 const extractJsonObject = (rawContent: string): string | null => {
   const trimmed = rawContent.trim()

@@ -49,8 +49,28 @@ const renderInlineMarkdown = (text: string): ReactNode[] =>
         return <strong key={`${chunk}-${index}`}>{chunk.slice(2, -2)}</strong>
       }
 
-      return <span key={`${chunk}-${index}`}>{chunk}</span>
+      return <span key={`${chunk}-${index}`}>{renderKeywordText(chunk)}</span>
     })
+
+const renderKeywordText = (text: string): ReactNode[] => {
+  const keywordPattern =
+    /\b(variable|variables|if|else|true|false|boolean|booleano|string|texto|integer|entero|float|decimal|lista|listas|arreglo|arreglos|bucle|bucles|for|while)\b/gi
+  const exactKeywordPattern =
+    /^(variable|variables|if|else|true|false|boolean|booleano|string|texto|integer|entero|float|decimal|lista|listas|arreglo|arreglos|bucle|bucles|for|while)$/i
+
+  return text
+    .split(keywordPattern)
+    .filter((chunk) => chunk.length > 0)
+    .map((chunk, index) =>
+      exactKeywordPattern.test(chunk) ? (
+        <span key={`${chunk}-${index}`} className="code-keyword">
+          {chunk}
+        </span>
+      ) : (
+        <span key={`${chunk}-${index}`}>{chunk}</span>
+      ),
+    )
+}
 
 export function MarkdownMessage({ text }: MarkdownMessageProps) {
   return (

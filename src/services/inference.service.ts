@@ -1,6 +1,7 @@
 import type {
   AiChatMessage,
   TivotAssistantPayload,
+  TivotChatMessage,
   TivotConversationContext,
   TivotConversationMetadata,
   TivotInteractiveFlowProblem,
@@ -21,6 +22,7 @@ const MAX_CONTEXT_MESSAGES = 6
 interface ProcessUserActionInput {
   userPayload: TivotUserPayload
   context: TivotConversationContext
+  conversationHistory?: TivotChatMessage[]
   catalog?: TivotProblem[]
 }
 
@@ -48,9 +50,10 @@ type FlowEvaluationResult = FailedFlowEvaluation | PassedFlowEvaluation
 export const processTivotUserAction = async ({
   userPayload,
   context,
+  conversationHistory,
   catalog = TIVOT_PROBLEM_CATALOG,
 }: ProcessUserActionInput): Promise<TivotResponse> => {
-  const result = await resolvePayload(userPayload, context, catalog)
+  const result = await resolvePayload(userPayload, context, catalog, conversationHistory)
 
   return {
     ...result,
@@ -62,12 +65,13 @@ const resolvePayload = async (
   userPayload: TivotUserPayload,
   context: TivotConversationContext,
   catalog: TivotProblem[],
+  conversationHistory?: TivotChatMessage[],
 ): Promise<Omit<TivotResponse, 'context'>> => {
   if (userPayload.user_action === 'submit_flow_order') {
     return resolveFlowSubmission(userPayload.problem_id, userPayload.submitted_order, catalog)
   }
 
-  const inferenceResult = await answerConversation(userPayload.message, context)
+  const inferenceResult = await answerConversation(userPayload.message, context, conversationHistory)
 
   return {
     ...inferenceResult,
@@ -123,17 +127,15 @@ const resolveFlowSubmission = async (
 const answerConversation = async (
   query: string,
   context: TivotConversationContext,
+  conversationHistory?: TivotChatMessage[],
 ): Promise<InferenceResult> => {
-  const fallbackPayload = createStandardTextPayload(
-    'Hola, soy Tivot, tu tutor de programacion basica con ejemplos de punto de venta. Podemos ver variables, IF, listas o bucles usando una caja registradora; que tema quieres probar primero?',
-    {
-      is_evaluation: false,
-      passed: null,
-      concept: 'Fundamentos POS',
-    },
-  )
+  const fallbackPayload = createConversationFallback(query, conversationHistory ?? [])
 
-  return completeWithFallback(buildConversationPrompt(query), fallbackPayload, buildCleanChatMessages(query, context))
+  return completeWithFallback(
+    buildConversationPrompt(query),
+    fallbackPayload,
+    buildCleanChatMessages(query, context, conversationHistory),
+  )
 }
 
 const answerFlowFailure = async (
@@ -166,16 +168,161 @@ const completeWithFallback = async (
   }
 }
 
-const buildCleanChatMessages = (query: string, context: TivotConversationContext): AiChatMessage[] => [
-  { role: 'system', content: TIVOT_SYSTEM_PROMPT },
-  ...context.turns.flatMap(cleanTurnMessages).slice(-MAX_CONTEXT_MESSAGES),
-  { role: 'user', content: query },
-]
+const buildCleanChatMessages = (
+  query: string,
+  context: TivotConversationContext,
+  conversationHistory?: TivotChatMessage[],
+): AiChatMessage[] => {
+  const historyMessages = conversationHistory?.flatMap(cleanChatMessage) ?? []
+  const contextMessages = context.turns.flatMap(cleanTurnMessages)
+  const cleanHistory = removeTrailingCurrentUserMessage(
+    historyMessages.length > 0 ? historyMessages : contextMessages,
+    query,
+  )
+
+  return [
+    { role: 'system', content: TIVOT_SYSTEM_PROMPT },
+    ...cleanHistory.slice(-MAX_CONTEXT_MESSAGES),
+    { role: 'user', content: query },
+  ]
+}
+
+const removeTrailingCurrentUserMessage = (messages: AiChatMessage[], query: string): AiChatMessage[] => {
+  const lastMessage = messages.at(-1)
+  if (lastMessage?.role === 'user' && normalizeText(lastMessage.content) === normalizeText(query)) {
+    return messages.slice(0, -1)
+  }
+
+  return messages
+}
+
+const cleanChatMessage = (message: TivotChatMessage): AiChatMessage[] => {
+  if (message.role === 'user') {
+    return [{ role: 'user', content: cleanText(message.content) }]
+  }
+
+  return [{ role: 'assistant', content: cleanText(message.payload.message) }]
+}
 
 const cleanTurnMessages = (turn: TivotConversationContext['turns'][number]): AiChatMessage[] => [
-  { role: 'user', content: turn.user_message },
-  { role: 'assistant', content: turn.assistant_message },
+  { role: 'user', content: cleanText(turn.user_message) },
+  { role: 'assistant', content: cleanText(turn.assistant_message) },
 ]
+
+const cleanText = (text: string): string => extractMessageFromJson(text).replace(/\s+/g, ' ').trim()
+
+const normalizeText = (text: string): string => cleanText(text).toLowerCase()
+
+const extractMessageFromJson = (text: string): string => {
+  const trimmedText = text.trim()
+  if (!trimmedText.startsWith('{')) return text
+
+  try {
+    const parsed: unknown = JSON.parse(trimmedText)
+    if (!parsed || typeof parsed !== 'object') return text
+
+    const record = parsed as Record<string, unknown>
+    const message = record.mensaje ?? record.message
+    return typeof message === 'string' && message.trim().length > 0 ? message : text
+  } catch {
+    return text
+  }
+}
+
+const createConversationFallback = (
+  query: string,
+  conversationHistory: TivotChatMessage[],
+): TivotAssistantPayload => {
+  const normalizedQuery = query.toLowerCase()
+  const hasPreviousAssistantMessage = conversationHistory.some((message) => message.role === 'assistant')
+
+  if (hasPreviousAssistantMessage && /condicional|if/.test(normalizedQuery)) {
+    return createStandardTextPayload(
+      'Un IF es como la caja decidiendo: si el cliente pago suficiente, imprime el ticket; si no, pide completar el pago. Que condicion revisarias primero: dinero recibido o total a pagar?',
+      {
+        is_evaluation: false,
+        passed: null,
+        concept: 'Condicional IF',
+      },
+      null,
+      ['💵 Dinero recibido', '🧾 Total a pagar', '🎟️ Descuento'],
+    )
+  }
+
+  if (hasPreviousAssistantMessage && /variable/.test(normalizedQuery)) {
+    return createStandardTextPayload(
+      'Una variable es una cajita con nombre donde guardas un dato del POS, como total_ticket = 120.50. Si quisieras guardar el nombre de un producto, como llamarias esa variable?',
+      {
+        is_evaluation: false,
+        passed: null,
+        concept: 'Variables',
+      },
+      null,
+      ['🏷️ nombre_producto', '💰 total_ticket', '📦 stock_producto'],
+    )
+  }
+
+  if (hasPreviousAssistantMessage && /lista|carrito|arreglo/.test(normalizedQuery)) {
+    return createStandardTextPayload(
+      'Una lista es como el carrito de compras: guarda varios productos en orden, por ejemplo carrito = ["Pan", "Leche", "Manzana"]. Que producto agregarias primero al carrito?',
+      {
+        is_evaluation: false,
+        passed: null,
+        concept: 'Listas',
+      },
+      null,
+      ['🍞 Pan', '🥛 Leche', '🍎 Manzana'],
+    )
+  }
+
+  if (hasPreviousAssistantMessage && /bucle|for|while/.test(normalizedQuery)) {
+    return createStandardTextPayload(
+      'Un bucle es repetir una accion, como escanear cada producto del carrito hasta terminar. Que dato deberia cambiar en cada vuelta: el producto actual o el nombre de la tienda?',
+      {
+        is_evaluation: false,
+        passed: null,
+        concept: 'Bucles',
+      },
+      null,
+      ['🛒 Producto actual', '🏬 Nombre tienda'],
+    )
+  }
+
+  const previousAssistantMessage = [...conversationHistory]
+    .reverse()
+    .find((message) => message.role === 'assistant')?.payload.message.toLowerCase()
+
+  if (
+    hasPreviousAssistantMessage &&
+    previousAssistantMessage?.includes('producto actual') &&
+    previousAssistantMessage.includes('nombre de la tienda')
+  ) {
+    const isCorrect = /producto actual/.test(normalizedQuery)
+    return createStandardTextPayload(
+      isCorrect
+        ? 'Exacto: en un bucle del POS cambia el producto actual en cada escaneo, mientras el nombre de la tienda se mantiene fijo. Ahora intentemos usar ese cambio para sumar precios; que quieres hacer?'
+        : 'Casi: el nombre de la tienda se mantiene igual, pero el producto actual cambia cada vez que el POS escanea otro articulo. Que paso hacemos ahora para practicarlo?',
+      {
+        is_evaluation: false,
+        passed: null,
+        concept: 'Bucles',
+      },
+      null,
+      ['🎯 Siguiente reto', '💻 Ver ejemplo', '📦 Cambiar a Variables'],
+    )
+  }
+
+  return createStandardTextPayload(
+    'Hola, soy Tivot, tu tutor de programacion basica con ejemplos de punto de venta. Podemos ver variables, IF, listas o bucles usando una caja registradora; que tema quieres probar primero?',
+    {
+      is_evaluation: false,
+      passed: null,
+      concept: 'Fundamentos POS',
+    },
+    null,
+    ['📦 Variables', '🔀 Condicional IF', '🛒 Listas', '🔁 Bucles'],
+  )
+}
 
 const evaluateFlowOrder = (
   problemId: string,

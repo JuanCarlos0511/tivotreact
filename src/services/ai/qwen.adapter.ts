@@ -1,5 +1,5 @@
-import type { AiChatMessage, AiProvider } from '@shared/types'
-import type { AiProviderRuntimeConfig } from './ai-provider.types'
+import type { AiProvider } from '@shared/types'
+import type { AiProviderRuntimeConfig, ChatContextMessage } from './ai-provider.types'
 
 interface QwenChatResponse {
   choices?: Array<{
@@ -12,7 +12,7 @@ interface QwenChatResponse {
 export class QwenAdapter implements AiProvider {
   constructor(private readonly config: AiProviderRuntimeConfig) {}
 
-  async complete(prompt: string, messages: AiChatMessage[] = [{ role: 'user', content: prompt }]): Promise<string> {
+  async complete(prompt: string, messages: ChatContextMessage[] = [{ role: 'user', content: prompt }]): Promise<string> {
     const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -21,7 +21,7 @@ export class QwenAdapter implements AiProvider {
       },
       body: JSON.stringify({
         model: this.config.modelName,
-        temperature: 0.4,
+        temperature: 0.5,
         response_format: { type: 'json_object' },
         messages,
       }),
