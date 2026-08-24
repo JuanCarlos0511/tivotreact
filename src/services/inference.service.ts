@@ -233,71 +233,18 @@ const createConversationFallback = (
   query: string,
   conversationHistory: TivotChatMessage[],
 ): TivotAssistantPayload => {
-  const normalizedQuery = query.toLowerCase()
+  const normalizedQuery = normalizeIntentText(query)
   const hasPreviousAssistantMessage = conversationHistory.some((message) => message.role === 'assistant')
-
-  if (hasPreviousAssistantMessage && /condicional|if/.test(normalizedQuery)) {
-    return createStandardTextPayload(
-      'Un IF es como la caja decidiendo: si el cliente pago suficiente, imprime el ticket; si no, pide completar el pago. Que condicion revisarias primero: dinero recibido o total a pagar?',
-      {
-        is_evaluation: false,
-        passed: null,
-        concept: 'Condicional IF',
-      },
-      null,
-      ['💵 Dinero recibido', '🧾 Total a pagar', '🎟️ Descuento'],
-    )
-  }
-
-  if (hasPreviousAssistantMessage && /variable/.test(normalizedQuery)) {
-    return createStandardTextPayload(
-      'Una variable es una cajita con nombre donde guardas un dato del POS, como total_ticket = 120.50. Si quisieras guardar el nombre de un producto, como llamarias esa variable?',
-      {
-        is_evaluation: false,
-        passed: null,
-        concept: 'Variables',
-      },
-      null,
-      ['🏷️ nombre_producto', '💰 total_ticket', '📦 stock_producto'],
-    )
-  }
-
-  if (hasPreviousAssistantMessage && /lista|carrito|arreglo/.test(normalizedQuery)) {
-    return createStandardTextPayload(
-      'Una lista es como el carrito de compras: guarda varios productos en orden, por ejemplo carrito = ["Pan", "Leche", "Manzana"]. Que producto agregarias primero al carrito?',
-      {
-        is_evaluation: false,
-        passed: null,
-        concept: 'Listas',
-      },
-      null,
-      ['🍞 Pan', '🥛 Leche', '🍎 Manzana'],
-    )
-  }
-
-  if (hasPreviousAssistantMessage && /bucle|for|while/.test(normalizedQuery)) {
-    return createStandardTextPayload(
-      'Un bucle es repetir una accion, como escanear cada producto del carrito hasta terminar. Que dato deberia cambiar en cada vuelta: el producto actual o el nombre de la tienda?',
-      {
-        is_evaluation: false,
-        passed: null,
-        concept: 'Bucles',
-      },
-      null,
-      ['🛒 Producto actual', '🏬 Nombre tienda'],
-    )
-  }
-
-  const previousAssistantMessage = [...conversationHistory]
-    .reverse()
-    .find((message) => message.role === 'assistant')?.payload.message.toLowerCase()
+  const previousAssistantMessage = normalizeIntentText(
+    [...conversationHistory].reverse().find((message) => message.role === 'assistant')?.payload.message ?? '',
+  )
 
   if (
     hasPreviousAssistantMessage &&
-    previousAssistantMessage?.includes('producto actual') &&
+    previousAssistantMessage.includes('producto actual') &&
     previousAssistantMessage.includes('nombre de la tienda')
   ) {
-    const isCorrect = /producto actual/.test(normalizedQuery)
+    const isCorrect = normalizedQuery.includes('producto actual')
     return createStandardTextPayload(
       isCorrect
         ? 'Exacto: en un bucle del POS cambia el producto actual en cada escaneo, mientras el nombre de la tienda se mantiene fijo. Ahora intentemos usar ese cambio para sumar precios; que quieres hacer?'
@@ -312,6 +259,104 @@ const createConversationFallback = (
     )
   }
 
+  if (
+    hasPreviousAssistantMessage &&
+    previousAssistantMessage.includes('dinero recibido') &&
+    previousAssistantMessage.includes('total a pagar')
+  ) {
+    if (normalizedQuery.includes('descuento')) {
+      return createStandardTextPayload(
+        'Buen camino: el descuento puede cambiar el total a pagar antes de revisar si el dinero alcanza. En un POS, primero calculas el total final y luego comparas el pago; que revisarias despues?',
+        {
+          is_evaluation: false,
+          passed: null,
+          concept: 'Condicional IF',
+        },
+        null,
+        ['💵 Dinero recibido', '🧾 Total final', '🎯 Crear un IF'],
+      )
+    }
+
+    const isCorrect = normalizedQuery.includes('dinero') || normalizedQuery.includes('total')
+    return createStandardTextPayload(
+      isCorrect
+        ? 'Correcto: para decidir con IF, la caja compara el dinero recibido contra el total a pagar. Si dinero_recibido >= total_a_pagar, imprime el ticket; que pasa en el caso contrario?'
+        : 'Casi: el IF necesita comparar datos de la venta, como dinero_recibido y total_a_pagar. Que dato usarias para saber si el cliente puede pagar?',
+      {
+        is_evaluation: false,
+        passed: null,
+        concept: 'Condicional IF',
+      },
+      null,
+      ['🧾 Imprimir ticket', '💬 Pedir completar pago', '🎯 Otro ejemplo'],
+    )
+  }
+
+  if (isConditionalIntent(normalizedQuery)) {
+    return createStandardTextPayload(
+      'Un IF es como la caja decidiendo: si el cliente pago suficiente, imprime el ticket; si no, pide completar el pago. Que condicion revisarias primero: dinero recibido o total a pagar?',
+      {
+        is_evaluation: false,
+        passed: null,
+        concept: 'Condicional IF',
+      },
+      null,
+      ['💵 Dinero recibido', '🧾 Total a pagar', '🎟️ Descuento'],
+    )
+  }
+
+  if (isVariableIntent(normalizedQuery)) {
+    return createStandardTextPayload(
+      'Una variable es una cajita con nombre donde guardas un dato del POS, como total_ticket = 120.50. Si quisieras guardar el nombre de un producto, como llamarias esa variable?',
+      {
+        is_evaluation: false,
+        passed: null,
+        concept: 'Variables',
+      },
+      null,
+      ['🏷️ nombre_producto', '💰 total_ticket', '📦 stock_producto'],
+    )
+  }
+
+  if (isListIntent(normalizedQuery)) {
+    return createStandardTextPayload(
+      'Una lista es como el carrito de compras: guarda varios productos en orden, por ejemplo carrito = ["Pan", "Leche", "Manzana"]. Que producto agregarias primero al carrito?',
+      {
+        is_evaluation: false,
+        passed: null,
+        concept: 'Listas',
+      },
+      null,
+      ['🍞 Pan', '🥛 Leche', '🍎 Manzana'],
+    )
+  }
+
+  if (isLoopIntent(normalizedQuery)) {
+    return createStandardTextPayload(
+      'Un bucle es repetir una accion, como escanear cada producto del carrito hasta terminar. Que dato deberia cambiar en cada vuelta: el producto actual o el nombre de la tienda?',
+      {
+        is_evaluation: false,
+        passed: null,
+        concept: 'Bucles',
+      },
+      null,
+      ['🛒 Producto actual', '🏬 Nombre tienda'],
+    )
+  }
+
+  if (hasPreviousAssistantMessage) {
+    return createStandardTextPayload(
+      'Sigamos desde aqui: toma tu respuesta como una pista del POS y conectemosla con el concepto anterior. Quieres que lo convirtamos en ejemplo de codigo o en un reto corto?',
+      {
+        is_evaluation: false,
+        passed: null,
+        concept: 'Fundamentos POS',
+      },
+      null,
+      ['💻 Ver ejemplo', '🎯 Reto corto', '📦 Cambiar tema'],
+    )
+  }
+
   return createStandardTextPayload(
     'Hola, soy Tivot, tu tutor de programacion basica con ejemplos de punto de venta. Podemos ver variables, IF, listas o bucles usando una caja registradora; que tema quieres probar primero?',
     {
@@ -323,6 +368,20 @@ const createConversationFallback = (
     ['📦 Variables', '🔀 Condicional IF', '🛒 Listas', '🔁 Bucles'],
   )
 }
+
+const normalizeIntentText = (text: string): string =>
+  normalizeText(text)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+
+const isVariableIntent = (text: string): boolean => /\bvariables?\b/.test(text)
+
+const isConditionalIntent = (text: string): boolean =>
+  /\b(if|condicional(?:es)?|condicion(?:es|ante|antes)?|decision(?:es)?)\b/.test(text)
+
+const isListIntent = (text: string): boolean => /\b(lista(?:s)?|carrito(?:s)?|arreglo(?:s)?)\b/.test(text)
+
+const isLoopIntent = (text: string): boolean => /\b(bucle(?:s)?|ciclo(?:s)?|for|while|repetir|repeticion(?:es)?)\b/.test(text)
 
 const evaluateFlowOrder = (
   problemId: string,
