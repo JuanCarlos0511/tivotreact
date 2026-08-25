@@ -1,33 +1,30 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react'
-import { Loader2, PanelLeft, PanelRight, Send } from 'lucide-react'
-import type { TivotChatSession } from '@shared/types'
+import { ArrowLeft, Loader2, Send } from 'lucide-react'
+import type { KarelLevel, TivotChatSession } from '@shared/types'
 import { ChatMessageItem } from './ChatMessageItem'
-import { EmptyChatHero } from './EmptyChatHero'
 
 interface ChatWorkspaceProps {
   session: TivotChatSession | null
+  activeLevel: KarelLevel
   query: string
   isResponding: boolean
   onQueryChange: (query: string) => void
   onSubmitMessage: () => Promise<void>
   onSelectQuickReply: (optionText: string) => Promise<void>
   onSubmitFlowOrder: (messageId: string, problemId: string, submittedOrder: string[]) => Promise<void>
-  onSelectStarterTopic: (prompt: string, problemId?: string) => Promise<void>
-  isSidebarOpen: boolean
-  onToggleSidebar: () => void
+  onBackToLevels: () => void
 }
 
 export function ChatWorkspace({
   session,
+  activeLevel,
   query,
   isResponding,
   onQueryChange,
   onSubmitMessage,
   onSelectQuickReply,
   onSubmitFlowOrder,
-  onSelectStarterTopic,
-  isSidebarOpen,
-  onToggleSidebar,
+  onBackToLevels,
 }: ChatWorkspaceProps) {
   const messageEndRef = useRef<HTMLDivElement | null>(null)
   const hasMessages = (session?.messages.length ?? 0) > 0
@@ -52,23 +49,23 @@ export function ChatWorkspace({
         <span className="node node-three" />
       </div>
       <div className={`conversation-stage ${hasMessages ? '' : 'conversation-stage-empty'}`}>
-        {hasMessages ? (
-          <header className="conversation-header" aria-label="Conversacion activa">
+        <header className="conversation-header karel-workspace-header" aria-label="Nivel activo">
             <button
-              className="workspace-sidebar-toggle"
+              className="workspace-back-button"
               type="button"
-              aria-label={isSidebarOpen ? 'Ocultar barra lateral' : 'Mostrar barra lateral'}
-              title={isSidebarOpen ? 'Ocultar barra lateral' : 'Mostrar barra lateral'}
-              onClick={onToggleSidebar}
+              aria-label="Volver a mapas"
+              title="Volver a mapas"
+              onClick={onBackToLevels}
             >
-              {isSidebarOpen ? <PanelLeft size={16} /> : <PanelRight size={16} />}
+              <ArrowLeft size={16} />
+              <span>Volver a Mapas</span>
             </button>
-            <h1>{session?.title ?? 'Nueva conversacion'}</h1>
-            <span className="model-status-pill">Qwen Plus • Modo Tutor</span>
+            <div className="workspace-level-copy">
+              <span className="workspace-level-badge">Nivel {activeLevel.id}</span>
+              <h1>{activeLevel.title.replace(/^Nivel \d+: /, '')}</h1>
+            </div>
+            <span className="model-status-pill">Karel Tutor</span>
           </header>
-        ) : (
-          <EmptyChatHero onSelectStarterTopic={onSelectStarterTopic} />
-        )}
         {hasMessages && (
           <div className="messages-panel" aria-live="polite">
             {session?.messages.map((message) => (
@@ -86,7 +83,7 @@ export function ChatWorkspace({
                 <div className="assistant-message-layout">
                   <div className="assistant-avatar assistant-avatar-loading" aria-hidden="true" />
                   <div className="message-bubble assistant-message message-loading">
-                    <span>Tivot esta preparando tu reto</span>
+                    <span>Karel esta revisando tu programa</span>
                     <span className="typing-dots" aria-hidden="true">
                       <span />
                       <span />
@@ -104,7 +101,7 @@ export function ChatWorkspace({
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Escribe tu duda de programacion..."
+            placeholder="Escribe tu duda o pega tu codigo Karel..."
             rows={2}
           />
           <button

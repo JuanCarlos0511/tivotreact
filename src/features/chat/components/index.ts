@@ -1,6 +1,5 @@
 export * from './ChatMessageItem'
 export * from './ChatWorkspace'
-export * from './EmptyChatHero'
 export * from './MarkdownMessage'
 export * from './ReorderableFlow'
 export * from './SettingsModal'

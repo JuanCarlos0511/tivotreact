@@ -54,9 +54,9 @@ const renderInlineMarkdown = (text: string): ReactNode[] =>
 
 const renderKeywordText = (text: string): ReactNode[] => {
   const keywordPattern =
-    /\b(variable|variables|if|else|true|false|boolean|booleano|string|texto|integer|entero|float|decimal|lista|listas|arreglo|arreglos|bucle|bucles|for|while)\b/gi
+    /\b(avanza|gira-izquierda|apagate|coge-zumbador|deja-zumbador|repetir|veces|inicio|fin|si|entonces|mientras|hacer|define-nueva-instruccion|frente-libre|junto-a-zumbador|orientado-al-norte|calle|calles|avenida|avenidas|zumbador|zumbadores|norte|sur|este|oeste|if|while)\b/gi
   const exactKeywordPattern =
-    /^(variable|variables|if|else|true|false|boolean|booleano|string|texto|integer|entero|float|decimal|lista|listas|arreglo|arreglos|bucle|bucles|for|while)$/i
+    /^(avanza|gira-izquierda|apagate|coge-zumbador|deja-zumbador|repetir|veces|inicio|fin|si|entonces|mientras|hacer|define-nueva-instruccion|frente-libre|junto-a-zumbador|orientado-al-norte|calle|calles|avenida|avenidas|zumbador|zumbadores|norte|sur|este|oeste|if|while)$/i
 
   return text
     .split(keywordPattern)

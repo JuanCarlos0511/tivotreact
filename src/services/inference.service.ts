@@ -1,5 +1,6 @@
 import type {
   AiChatMessage,
+  KarelLevel,
   TivotAssistantPayload,
   TivotChatMessage,
   TivotConversationContext,
@@ -10,8 +11,7 @@ import type {
   TivotStandardTextPayload,
   TivotUserPayload,
 } from '@shared/types'
-import { TIVOT_PROBLEM_CATALOG } from '@shared/catalog'
-import { TIVOT_SYSTEM_PROMPT, buildConversationPrompt, buildFlowHintPrompt } from '@shared/prompts'
+import { KAREL_SYSTEM_PROMPT, buildConversationPrompt, buildKarelLevelContext } from '@shared/prompts'
 import { createStandardTextPayload, isInteractiveFlowProblem } from '@shared/types'
 import { env } from '@config/env'
 import { createAiProvider } from './ai'
@@ -25,6 +25,7 @@ interface ProcessUserActionInput {
   context: TivotConversationContext
   conversationHistory?: TivotChatMessage[]
   catalog?: TivotProblem[]
+  activeLevel?: KarelLevel | null
 }
 
 interface InferenceResult {
@@ -52,9 +53,10 @@ export const processTivotUserAction = async ({
   userPayload,
   context,
   conversationHistory,
-  catalog = TIVOT_PROBLEM_CATALOG,
+  catalog = [],
+  activeLevel = null,
 }: ProcessUserActionInput): Promise<TivotResponse> => {
-  const result = await resolvePayload(userPayload, context, catalog, conversationHistory)
+  const result = await resolvePayload(userPayload, context, catalog, conversationHistory, activeLevel)
 
   return {
     ...result,
@@ -67,12 +69,13 @@ const resolvePayload = async (
   context: TivotConversationContext,
   catalog: TivotProblem[],
   conversationHistory?: TivotChatMessage[],
+  activeLevel: KarelLevel | null = null,
 ): Promise<Omit<TivotResponse, 'context'>> => {
   if (userPayload.user_action === 'submit_flow_order') {
     return resolveFlowSubmission(userPayload.problem_id, userPayload.submitted_order, catalog)
   }
 
-  const inferenceResult = await answerConversation(userPayload.message, context, conversationHistory)
+  const inferenceResult = await answerConversation(userPayload.message, context, conversationHistory, activeLevel)
 
   return {
     ...inferenceResult,
@@ -129,11 +132,12 @@ const answerConversation = async (
   query: string,
   context: TivotConversationContext,
   conversationHistory?: TivotChatMessage[],
+  activeLevel: KarelLevel | null = null,
 ): Promise<InferenceResult> => {
   return completeWithFallback(
-    buildConversationPrompt(query),
+    buildConversationPrompt(query, activeLevel),
     createAiUnavailablePayload(),
-    buildCleanChatMessages(query, context, conversationHistory),
+    buildCleanChatMessages(query, context, conversationHistory, activeLevel),
   )
 }
 
@@ -143,7 +147,20 @@ const answerFlowFailure = async (
   violatedRule: string,
   fallbackPayload: TivotAssistantPayload,
 ): Promise<InferenceResult> =>
-  completeWithFallback(buildFlowHintPrompt(problem, submittedOrder, violatedRule), fallbackPayload)
+  completeWithFallback(
+    [
+      KAREL_SYSTEM_PROMPT,
+      '',
+      'Genera una pista socratica de maximo 80 palabras para un orden incorrecto.',
+      'No reveles el orden correcto completo.',
+      'Devuelve solo el JSON del formato estricto con tipo="texto" y cuadros=null.',
+      '',
+      `PROBLEMA: ${problem.problem_id} - ${problem.title}`,
+      `REGLA_INFRINGIDA: ${violatedRule}`,
+      `ORDEN_ENVIADO: ${JSON.stringify(submittedOrder)}`,
+    ].join('\n'),
+    fallbackPayload,
+  )
 
 const completeWithFallback = async (
   prompt: string,
@@ -173,6 +190,7 @@ const buildCleanChatMessages = (
   query: string,
   context: TivotConversationContext,
   conversationHistory?: TivotChatMessage[],
+  activeLevel: KarelLevel | null = null,
 ): AiChatMessage[] => {
   const historyMessages = conversationHistory?.flatMap(cleanChatMessage) ?? []
   const contextMessages = context.turns.flatMap(cleanTurnMessages)
@@ -182,7 +200,7 @@ const buildCleanChatMessages = (
   )
 
   return [
-    { role: 'system', content: TIVOT_SYSTEM_PROMPT },
+    { role: 'system', content: `${KAREL_SYSTEM_PROMPT}\n\n${buildKarelLevelContext(activeLevel)}` },
     ...cleanHistory.slice(-MAX_CONTEXT_MESSAGES),
     { role: 'user', content: query },
   ]

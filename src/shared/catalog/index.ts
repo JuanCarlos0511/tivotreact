@@ -1,2 +1,1 @@
-export * from './tivot-starter-topics.catalog'
-export * from './tivot-problems.catalog'
+export * from './karel-levels.catalog'

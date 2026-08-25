@@ -1,1 +1,1 @@
-export * from './tivot-system.prompt'
+export * from './karel-system.prompt'

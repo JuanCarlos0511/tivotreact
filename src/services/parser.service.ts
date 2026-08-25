@@ -85,7 +85,7 @@ const normalizeSpanishPayload = (payload: z.infer<typeof spanishAssistantPayload
       metadata: {
         is_evaluation: false,
         passed: null,
-        concept: 'Fundamentos POS',
+        concept: 'Karel',
       },
     }
   }
@@ -93,15 +93,15 @@ const normalizeSpanishPayload = (payload: z.infer<typeof spanishAssistantPayload
   return createStandardTextPayload(payload.mensaje, {
     is_evaluation: false,
     passed: null,
-    concept: 'Fundamentos POS',
+    concept: 'Karel',
   }, null, payload.opciones)
 }
 
 const createFallbackPayload = (rawContent: string): TivotAssistantPayload =>
-  createStandardTextPayload(rawContent.trim() || 'No pude leer la respuesta. Probemos con un ejemplo POS sencillo.', {
+  createStandardTextPayload(rawContent.trim() || 'No pude leer la respuesta. Probemos con un ejemplo de Karel sencillo.', {
     is_evaluation: false,
     passed: null,
-    concept: 'Fundamentos POS',
+    concept: 'Karel',
   })
 
 const cleanOptions = (options: string[] | null | undefined): string[] | null => {

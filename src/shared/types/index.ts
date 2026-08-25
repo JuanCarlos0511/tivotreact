@@ -191,3 +191,31 @@ export interface TivotStarterTopic {
   problemId?: string
   icon: StarterTopicIcon
 }
+
+export type KarelGridPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+export type KarelDirection = 'norte' | 'sur' | 'este' | 'oeste'
+
+export interface KarelWorldPoint {
+  avenue: number | null
+  street: number
+}
+
+export interface KarelWorld {
+  start: KarelWorldPoint & {
+    direction: KarelDirection
+  }
+  goal: KarelWorldPoint
+  beepers: ReadonlyArray<KarelWorldPoint & { count: number }>
+  walls: readonly string[]
+  backpack?: number
+}
+
+export interface KarelLevel {
+  id: number
+  title: string
+  description: string
+  gridPosition: KarelGridPosition
+  commands: readonly string[]
+  world: KarelWorld
+  initialMessage: string
+}
