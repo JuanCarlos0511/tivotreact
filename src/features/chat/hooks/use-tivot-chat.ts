@@ -39,11 +39,14 @@ const createLevelSessionId = (levelId: number) => `karel-level-${levelId}`
 
 const createInitialLevelMessage = (level: KarelLevel): TivotAssistantChatMessage =>
   createAssistantMessage(
-    createStandardTextPayload(level.initialMessage, {
-      is_evaluation: false,
-      passed: null,
-      concept: level.title,
-    }),
+    createStandardTextPayload(
+      `Objetivo del mapa: ${level.objective}\n\n${level.initialMessage}`,
+      {
+        is_evaluation: false,
+        passed: null,
+        concept: level.title,
+      },
+    ),
   )
 
 const createLevelSession = (level: KarelLevel): TivotChatSession => ({
@@ -211,6 +214,7 @@ export const useTivotChat = (activeLevel: KarelLevel | null) => {
     setActiveSessionId,
     setQuery,
     submitMessage,
+    submitPrompt,
     submitQuickReply,
     createChat: startNewChat,
     startNewChat,

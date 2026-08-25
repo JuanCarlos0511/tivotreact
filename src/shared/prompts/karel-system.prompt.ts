@@ -42,9 +42,11 @@ export const buildKarelLevelContext = (level: KarelLevel | null): string => {
 
   return [
     `NIVEL ACTUAL: ${level.title}`,
-    `DESCRIPCION: ${level.description}`,
+    `DESCRIPCION: ${level.subtitle}`,
+    `OBJETIVO: ${level.objective}`,
     `COMANDOS DISPONIBLES: ${level.commands.join(', ')}`,
-    `MUNDO INICIAL SUGERIDO: ${JSON.stringify(level.world)}`,
+    `MUNDO INICIAL 8x8: ${JSON.stringify(level.initialWorld)}`,
+    `CODIGO INICIAL: ${level.starterCode}`,
   ].join('\n')
 }
 

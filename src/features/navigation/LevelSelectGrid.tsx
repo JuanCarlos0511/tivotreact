@@ -32,7 +32,7 @@ export function LevelSelectGrid({ onBack, onSelectLevel }: LevelSelectGridProps)
               <CheckCircle2 size={15} />
             </span>
             <span className="level-card-title">{level.title.replace(/^Nivel \d+: /, '')}</span>
-            <span className="level-card-description">{level.description}</span>
+            <span className="level-card-description">{level.subtitle}</span>
             <span className="level-command-list">
               {level.commands.map((command) => (
                 <span key={command} className="level-command-chip">
