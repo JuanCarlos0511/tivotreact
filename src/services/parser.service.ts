@@ -69,27 +69,6 @@ export const parseAssistantPayload = (rawContent: string): TivotAssistantPayload
 }
 
 const normalizeSpanishPayload = (payload: z.infer<typeof spanishAssistantPayloadSchema>): TivotAssistantPayload => {
-  if (payload.tipo === 'flujo' && payload.cuadros && payload.cuadros.length >= 4) {
-    return {
-      type: 'interactive_flow',
-      problem_id: 'generated-pos-flow',
-      message: payload.mensaje,
-      options: null,
-      flow_data: {
-        instruction: 'Ordena los pasos del punto de venta.',
-        nodes: payload.cuadros.slice(0, 4).map((label, index) => ({
-          id: `n${index + 1}`,
-          label,
-        })),
-      },
-      metadata: {
-        is_evaluation: false,
-        passed: null,
-        concept: 'Karel',
-      },
-    }
-  }
-
   return createStandardTextPayload(payload.mensaje, {
     is_evaluation: false,
     passed: null,
@@ -98,11 +77,30 @@ const normalizeSpanishPayload = (payload: z.infer<typeof spanishAssistantPayload
 }
 
 const createFallbackPayload = (rawContent: string): TivotAssistantPayload =>
-  createStandardTextPayload(rawContent.trim() || 'No pude leer la respuesta. Probemos con un ejemplo de Karel sencillo.', {
+  createStandardTextPayload(cleanAssistantText(rawContent) || 'No pude leer la respuesta. Probemos con un ejemplo de Karel sencillo.', {
     is_evaluation: false,
     passed: null,
     concept: 'Karel',
   })
+
+const cleanAssistantText = (rawContent: string): string => {
+  const trimmed = rawContent.trim()
+  const jsonSource = extractJsonObject(trimmed)
+  if (!jsonSource) return trimmed
+
+  try {
+    const parsed: unknown = JSON.parse(jsonSource)
+    if (!parsed || typeof parsed !== 'object') return trimmed
+
+    const record = parsed as Record<string, unknown>
+    const message = record.mensaje ?? record.message ?? record.respuesta ?? record.response
+    if (typeof message === 'string' && message.trim().length > 0) return message.trim()
+  } catch {
+    return trimmed.replace(/^\{|\}$/g, '').replace(/"(tipo|mensaje|cuadros|opciones)"\s*:\s*/g, '').trim()
+  }
+
+  return trimmed
+}
 
 const cleanOptions = (options: string[] | null | undefined): string[] | null => {
   if (!Array.isArray(options)) return null

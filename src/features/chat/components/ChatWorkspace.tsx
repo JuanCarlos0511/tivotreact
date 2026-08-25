@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react'
 import type { KarelLevel, TivotChatSession } from '@shared/types'
 import { KarelCodeEditor } from '@features/karel/components/KarelCodeEditor'
 import { KarelGrid8x8 } from '@features/karel/components/KarelGrid8x8'
+import { useKarelRunner } from '@features/karel/hooks/use-karel-runner'
 import { FloatingChatDrawer } from './FloatingChatDrawer'
 
 interface ChatWorkspaceProps {
@@ -12,7 +13,6 @@ interface ChatWorkspaceProps {
   isResponding: boolean
   onQueryChange: (query: string) => void
   onSubmitMessage: () => Promise<void>
-  onSubmitPrompt: (prompt: string) => Promise<void>
   onSelectQuickReply: (optionText: string) => Promise<void>
   onSubmitFlowOrder: (messageId: string, problemId: string, submittedOrder: string[]) => Promise<void>
   onBackToLevels: () => void
@@ -25,7 +25,6 @@ export function ChatWorkspace({
   isResponding,
   onQueryChange,
   onSubmitMessage,
-  onSubmitPrompt,
   onSelectQuickReply,
   onSubmitFlowOrder,
   onBackToLevels,
@@ -33,16 +32,23 @@ export function ChatWorkspace({
   const [code, setCode] = useState(activeLevel.starterCode)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [showObjective, setShowObjective] = useState(true)
+  const runner = useKarelRunner(activeLevel.initialWorld)
 
   useEffect(() => {
     setCode(activeLevel.starterCode)
     setIsChatOpen(false)
     setShowObjective(true)
+    runner.resetExecution()
   }, [activeLevel])
 
-  const submitCodeToTutor = async (action: 'compilar' | 'ejecutar') => {
-    setIsChatOpen(true)
-    await onSubmitPrompt(`Quiero ${action} este programa Karel:\n\n\`\`\`pascal\n${code}\n\`\`\``)
+  const resetCodeAndWorld = () => {
+    setCode(activeLevel.starterCode)
+    runner.resetExecution()
+  }
+
+  const handleCodeChange = (nextCode: string) => {
+    setCode(nextCode)
+    if (!runner.isRunning) runner.resetExecution()
   }
 
   return (
@@ -58,14 +64,24 @@ export function ChatWorkspace({
         </div>
       </header>
 
-      <KarelGrid8x8 world={activeLevel.initialWorld} />
+      <KarelGrid8x8 world={runner.worldState} />
 
       <KarelCodeEditor
         code={code}
-        onChange={setCode}
-        onCompile={() => void submitCodeToTutor('compilar')}
-        onRun={() => void submitCodeToTutor('ejecutar')}
-        onReset={() => setCode(activeLevel.starterCode)}
+        activeLineNumber={runner.activeLineNumber}
+        compileResult={runner.compileResult}
+        executionError={runner.executionError}
+        isRunning={runner.isRunning}
+        isPaused={runner.isPaused}
+        speedMultiplier={runner.speedMultiplier}
+        onChange={handleCodeChange}
+        onCompile={() => runner.compileCode(code)}
+        onRun={() => runner.runCode(code)}
+        onReset={resetCodeAndWorld}
+        onPauseToggle={runner.togglePause}
+        onStepBack={runner.stepBack}
+        onStepForward={() => runner.stepForward(code)}
+        onSpeedChange={runner.setSpeedMultiplier}
       />
 
       <FloatingChatDrawer

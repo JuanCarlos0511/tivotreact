@@ -1321,6 +1321,7 @@ button { cursor: pointer; }
   color: #d1fae5;
   background: rgba(6, 78, 59, 0.72);
   box-shadow: 0 0 18px rgba(16, 185, 129, 0.72);
+  transition: all 0.3s ease-in-out;
 }
 
 .karel-token span {
@@ -1383,7 +1384,7 @@ button { cursor: pointer; }
 }
 
 .editor-run-button {
-  min-width: 116px;
+  min-width: 96px;
   border: 0;
   color: #04110b;
   background: linear-gradient(180deg, #7cf5bc, #10b981);
@@ -1413,16 +1414,90 @@ button { cursor: pointer; }
   font-size: 11px;
 }
 
+.karel-compile-status {
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.karel-compile-status.success {
+  border: 1px solid rgba(16, 185, 129, 0.38);
+  color: #bbf7d0;
+  background: rgba(16, 185, 129, 0.13);
+}
+
+.karel-compile-status.error {
+  border: 1px solid rgba(248, 113, 113, 0.42);
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.28);
+}
+
+.karel-code-shell {
+  position: relative;
+  min-height: 210px;
+  overflow: hidden;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.karel-code-highlight {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  padding: 12px 0;
+  color: #a7f3d0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  pointer-events: none;
+  white-space: pre;
+}
+
+.karel-code-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  min-height: 18px;
+  border-left: 4px solid transparent;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.karel-code-row.active {
+  border-left-color: #34d399;
+  color: #d1fae5;
+  background: rgba(16, 185, 129, 0.25);
+}
+
+.karel-line-number {
+  padding-right: 8px;
+  color: #64748b;
+  text-align: right;
+  user-select: none;
+}
+
+.karel-code-row code {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font: inherit;
+  text-overflow: clip;
+}
+
 .karel-code-textarea {
+  position: relative;
+  z-index: 1;
   width: 100%;
   min-height: 210px;
   resize: vertical;
-  padding: 12px;
-  border: 1px solid rgba(16, 185, 129, 0.2);
-  border-radius: 8px;
+  padding: 12px 0 12px 38px;
+  border: 0;
+  border-radius: 0;
   outline: 0;
-  color: #a7f3d0;
-  background: rgba(0, 0, 0, 0.6);
+  color: transparent;
+  caret-color: #a7f3d0;
+  background: transparent;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   font-size: 12px;
   line-height: 1.5;
@@ -1430,8 +1505,81 @@ button { cursor: pointer; }
 }
 
 .karel-code-textarea:focus {
-  border-color: rgba(16, 185, 129, 0.62);
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.runner-control-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 5px;
+}
+
+.runner-icon-button,
+.runner-speed-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  border-radius: 7px;
+  color: #a7f3d0;
+  background: rgba(6, 78, 59, 0.22);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.runner-icon-button {
+  flex: 0 0 30px;
+  width: 30px;
+  padding: 0;
+}
+
+.runner-pause-button {
+  color: #04110b;
+  background: linear-gradient(180deg, #bef264, #34d399);
+}
+
+.runner-speed-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding-left: 3px;
+}
+
+.runner-speed-button {
+  min-width: 31px;
+  padding: 0 5px;
+  color: #94a3b8;
+  background: rgba(15, 23, 42, 0.68);
+}
+
+.runner-speed-button.active {
+  border-color: rgba(16, 185, 129, 0.68);
+  color: #04110b;
+  background: #10b981;
+}
+
+.editor-secondary-button:disabled,
+.editor-run-button:disabled,
+.runner-icon-button:disabled,
+.runner-speed-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+@media (max-width: 430px) {
+  .karel-editor-actions {
+    flex-wrap: wrap;
+  }
+
+  .runner-control-group {
+    order: 3;
+    flex-basis: 100%;
+  }
 }
 
 .floating-chat-anchor {

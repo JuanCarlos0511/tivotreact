@@ -41,7 +41,6 @@ function App() {
           isResponding={chat.isResponding}
           onQueryChange={chat.setQuery}
           onSubmitMessage={chat.submitMessage}
-          onSubmitPrompt={chat.submitPrompt}
           onSelectQuickReply={chat.submitQuickReply}
           onSubmitFlowOrder={chat.submitFlowOrder}
           onBackToLevels={handleBackToLevels}

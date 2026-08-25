@@ -1,18 +1,47 @@
-import { RotateCcw, Send, Terminal } from 'lucide-react'
+import { Pause, Play, RotateCcw, Send, StepBack, StepForward, Terminal } from 'lucide-react'
 import { useRef } from 'react'
+import type { CompileResult, KarelSpeedMultiplier } from '@features/karel/hooks/use-karel-runner'
 
 interface KarelCodeEditorProps {
   code: string
+  activeLineNumber: number | null
+  compileResult: CompileResult | null
+  executionError: string | null
+  isRunning: boolean
+  isPaused: boolean
+  speedMultiplier: KarelSpeedMultiplier
   onChange: (code: string) => void
   onCompile: () => void
   onRun: () => void
   onReset: () => void
+  onPauseToggle: () => void
+  onStepBack: () => void
+  onStepForward: () => void
+  onSpeedChange: (speedMultiplier: KarelSpeedMultiplier) => void
 }
 
 const QUICK_COMMANDS = ['avanza;', 'gira-izquierda;', 'coge-zumbador;', 'deja-zumbador;', 'apagate;'] as const
+const SPEED_OPTIONS: KarelSpeedMultiplier[] = [0.5, 1, 1.5, 2]
 
-export function KarelCodeEditor({ code, onChange, onCompile, onRun, onReset }: KarelCodeEditorProps) {
+export function KarelCodeEditor({
+  code,
+  activeLineNumber,
+  compileResult,
+  executionError,
+  isRunning,
+  isPaused,
+  speedMultiplier,
+  onChange,
+  onCompile,
+  onRun,
+  onReset,
+  onPauseToggle,
+  onStepBack,
+  onStepForward,
+  onSpeedChange,
+}: KarelCodeEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const lines = code.split('\n')
 
   const insertCommand = (command: string) => {
     const textarea = textareaRef.current
@@ -52,21 +81,89 @@ export function KarelCodeEditor({ code, onChange, onCompile, onRun, onReset }: K
           </button>
         ))}
       </div>
-      <textarea
-        ref={textareaRef}
-        className="karel-code-textarea"
-        value={code}
-        onChange={(event) => onChange(event.target.value)}
-        spellCheck={false}
-        rows={11}
-      />
+      {compileResult && (
+        <div className={`karel-compile-status ${compileResult.success && !executionError ? 'success' : 'error'}`}>
+          {compileResult.success && !executionError
+            ? '✓ Compilacion exitosa. Codigo listo para ejecutar.'
+            : `✕ Error${compileResult.error ? ` en linea ${compileResult.error.line}` : ''}: ${
+                executionError ?? compileResult.error?.message ?? 'No se pudo ejecutar el programa'
+              }`}
+        </div>
+      )}
+      <div className="karel-code-shell">
+        <div className="karel-code-highlight" aria-hidden="true">
+          {lines.map((line, index) => {
+            const lineNumber = index + 1
+            const isActive = activeLineNumber === lineNumber
+
+            return (
+              <div key={`${lineNumber}-${line}`} className={`karel-code-row ${isActive ? 'active' : ''}`}>
+                <span className="karel-line-number">{lineNumber}</span>
+                <code>{line || ' '}</code>
+              </div>
+            )
+          })}
+        </div>
+        <textarea
+          ref={textareaRef}
+          className="karel-code-textarea"
+          value={code}
+          onChange={(event) => onChange(event.target.value)}
+          spellCheck={false}
+          rows={11}
+        />
+      </div>
       <div className="karel-editor-actions">
-        <button className="editor-secondary-button" type="button" onClick={onCompile}>
+        <button className="editor-secondary-button" type="button" onClick={onCompile} disabled={isRunning}>
           Compilar
         </button>
-        <button className="editor-run-button" type="button" onClick={onRun}>
+        <div className="runner-control-group" aria-label="Controles de ejecucion">
+          <button
+            className="runner-icon-button"
+            type="button"
+            onClick={onStepBack}
+            disabled={isRunning}
+            aria-label="Retroceder un paso"
+            title="Retroceder un paso"
+          >
+            <StepBack size={14} />
+          </button>
+          <button
+            className="runner-icon-button runner-pause-button"
+            type="button"
+            onClick={onPauseToggle}
+            disabled={!isRunning && !isPaused}
+            aria-label={isPaused ? 'Reanudar ejecucion' : 'Pausar ejecucion'}
+            title={isPaused ? 'Reanudar ejecucion' : 'Pausar ejecucion'}
+          >
+            {isPaused ? <Play size={14} /> : <Pause size={14} />}
+          </button>
+          <button
+            className="runner-icon-button"
+            type="button"
+            onClick={onStepForward}
+            disabled={isRunning}
+            aria-label="Avanzar un paso"
+            title="Avanzar un paso"
+          >
+            <StepForward size={14} />
+          </button>
+          <div className="runner-speed-group" aria-label="Velocidad de ejecucion">
+            {SPEED_OPTIONS.map((option) => (
+              <button
+                key={option}
+                className={`runner-speed-button ${speedMultiplier === option ? 'active' : ''}`}
+                type="button"
+                onClick={() => onSpeedChange(option)}
+              >
+                x{option}
+              </button>
+            ))}
+          </div>
+        </div>
+        <button className="editor-run-button" type="button" onClick={onRun} disabled={isRunning}>
           <Send size={15} />
-          Ejecutar
+          {isRunning ? 'Ejecutando' : 'Ejecutar'}
         </button>
       </div>
     </section>

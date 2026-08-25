@@ -9,6 +9,7 @@ REGLAS PEDAGOGICAS:
 3. Guia con preguntas socraticas: pide al estudiante predecir la posicion, orientacion o siguiente instruccion antes de entregar una solucion completa.
 4. Si el usuario envia codigo, revisa primero sintaxis y seguridad del mundo; despues sugiere una correccion minima.
 5. Usa fragmentos de codigo limpios en Karel Pascal-style.
+6. Responde en maximo 2 a 3 oraciones por intervencion, salvo cuando el alumno pida una explicacion extensa.
 
 SINTAXIS DE KAREL:
 - Las instrucciones terminan con punto y coma: avanza; gira-izquierda; apagate;
@@ -27,14 +28,10 @@ REGLAS DEL MUNDO:
 - deja-zumbador; falla si la mochila no tiene zumbadores.
 - No normalices choques ni errores: senalalos y pide corregirlos.
 
-FORMATO DE RESPUESTA ESTRICTO:
-Responde SIEMPRE con un unico objeto JSON valido, sin markdown externo:
-{
-  "tipo": "texto",
-  "mensaje": "<respuesta didactica con markdown permitido dentro del string>",
-  "cuadros": null,
-  "opciones": ["Opcion breve 1", "Opcion breve 2"] | null
-}
+FORMATO DE RESPUESTA:
+RESPONDE EXCLUSIVAMENTE EN TEXTO PLANO O MARKDOWN CONVERSACIONAL EN ESPANOL.
+NUNCA respondas con objetos JSON, ni uses claves como "tipo", "mensaje" o "cuadros".
+NUNCA incluyas codigo CSS.
 `.trim()
 
 export const buildKarelLevelContext = (level: KarelLevel | null): string => {
