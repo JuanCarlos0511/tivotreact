@@ -21,7 +21,12 @@ interface KarelCodeEditorProps {
 }
 
 const QUICK_COMMANDS = ['avanza;', 'gira-izquierda;', 'coge-zumbador;', 'deja-zumbador;', 'apagate;'] as const
-const SPEED_OPTIONS: KarelSpeedMultiplier[] = [0.5, 1, 1.5, 2]
+
+const getNextSpeed = (currentSpeed: KarelSpeedMultiplier): KarelSpeedMultiplier => {
+  const cycle: KarelSpeedMultiplier[] = [1, 1.5, 2, 0.5]
+  const currentIndex = cycle.indexOf(currentSpeed)
+  return cycle[(currentIndex + 1) % cycle.length] ?? 1
+}
 
 export function KarelCodeEditor({
   code,
@@ -148,18 +153,15 @@ export function KarelCodeEditor({
           >
             <StepForward size={14} />
           </button>
-          <div className="runner-speed-group" aria-label="Velocidad de ejecucion">
-            {SPEED_OPTIONS.map((option) => (
-              <button
-                key={option}
-                className={`runner-speed-button ${speedMultiplier === option ? 'active' : ''}`}
-                type="button"
-                onClick={() => onSpeedChange(option)}
-              >
-                x{option}
-              </button>
-            ))}
-          </div>
+          <button
+            className="runner-speed-button active"
+            type="button"
+            onClick={() => onSpeedChange(getNextSpeed(speedMultiplier))}
+            aria-label={`Velocidad actual x${speedMultiplier}. Pulsar para cambiar.`}
+            title={`Velocidad actual x${speedMultiplier}`}
+          >
+            x{speedMultiplier}
+          </button>
         </div>
         <button className="editor-run-button" type="button" onClick={onRun} disabled={isRunning}>
           <Send size={15} />
