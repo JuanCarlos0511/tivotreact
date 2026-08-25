@@ -1,5 +1,5 @@
 import { Pause, Play, RotateCcw, Send, StepBack, StepForward, Terminal } from 'lucide-react'
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CompileResult, KarelSpeedMultiplier } from '@features/karel/hooks/use-karel-runner'
 
 interface KarelCodeEditorProps {
@@ -46,7 +46,26 @@ export function KarelCodeEditor({
   onSpeedChange,
 }: KarelCodeEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const highlightRef = useRef<HTMLDivElement | null>(null)
+  const [, forceFontRender] = useState(0)
   const lines = code.split('\n')
+
+  useEffect(() => {
+    if (!document.fonts) return
+
+    void document.fonts.ready.then(() => {
+      forceFontRender((current) => current + 1)
+    })
+  }, [])
+
+  const syncHighlightScroll = () => {
+    const textarea = textareaRef.current
+    const highlight = highlightRef.current
+    if (!textarea || !highlight) return
+
+    highlight.scrollTop = textarea.scrollTop
+    highlight.scrollLeft = textarea.scrollLeft
+  }
 
   const insertCommand = (command: string) => {
     const textarea = textareaRef.current
@@ -96,7 +115,7 @@ export function KarelCodeEditor({
         </div>
       )}
       <div className="karel-code-shell">
-        <div className="karel-code-highlight" aria-hidden="true">
+        <div ref={highlightRef} className="karel-code-highlight" aria-hidden="true">
           {lines.map((line, index) => {
             const lineNumber = index + 1
             const isActive = activeLineNumber === lineNumber
@@ -114,7 +133,9 @@ export function KarelCodeEditor({
           className="karel-code-textarea"
           value={code}
           onChange={(event) => onChange(event.target.value)}
+          onScroll={syncHighlightScroll}
           spellCheck={false}
+          wrap="off"
           rows={11}
         />
       </div>
