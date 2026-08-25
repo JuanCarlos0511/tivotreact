@@ -1769,3 +1769,233 @@ button { cursor: pointer; }
     width: min(236px, calc(100vw - 24px));
   }
 }
+
+.karel-app-shell {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.karel-workspace {
+  height: 100dvh;
+  min-height: 0;
+  max-height: 100dvh;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: 8px;
+  gap: 8px;
+  user-select: none;
+}
+
+.karel-game-header {
+  flex: 0 0 auto;
+  min-height: 38px;
+}
+
+.karel-board-panel {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  width: 100%;
+  max-height: 36dvh;
+  min-height: 0;
+  padding: 6px;
+}
+
+.karel-board-meta {
+  flex: 0 0 auto;
+  margin-bottom: 5px;
+  font-size: 10px;
+}
+
+.karel-board-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: min(100%, 36dvh);
+  max-width: 100%;
+  margin: 0 auto;
+  grid-template-columns: 14px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) 14px;
+  gap: 4px;
+}
+
+.karel-grid {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  aspect-ratio: 1;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-rows: repeat(8, minmax(0, 1fr));
+}
+
+.karel-street-labels,
+.karel-avenue-labels {
+  font-size: 9px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+}
+
+.karel-token {
+  width: min(24px, 78%);
+}
+
+.karel-token svg {
+  width: 13px;
+  height: 13px;
+}
+
+.karel-token span {
+  font-size: 9px;
+}
+
+.beeper-badge {
+  width: min(22px, 72%);
+  height: auto;
+  aspect-ratio: 1;
+  font-size: 10px;
+}
+
+.karel-editor-panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px;
+  gap: 7px;
+}
+
+.karel-editor-toolbar,
+.quick-command-row,
+.karel-compile-status,
+.karel-editor-actions {
+  flex: 0 0 auto;
+}
+
+.quick-command-row {
+  gap: 6px;
+  padding: 1px 0;
+}
+
+.quick-command-chip {
+  padding: 5px 7px;
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+.karel-compile-status {
+  padding: 5px 8px;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.karel-code-shell {
+  flex: 1 1 auto;
+  min-height: 140px;
+  max-height: 28dvh;
+  overflow: auto;
+}
+
+.karel-code-highlight,
+.karel-code-textarea {
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.karel-code-highlight {
+  min-height: 100%;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.karel-code-textarea {
+  min-height: 100%;
+  height: 100%;
+  resize: none;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  overflow: auto;
+}
+
+.karel-editor-actions {
+  min-height: 36px;
+  gap: 6px;
+}
+
+.editor-reset-button,
+.editor-secondary-button,
+.editor-run-button {
+  min-height: 30px;
+  font-size: 11px;
+}
+
+.runner-icon-button,
+.runner-speed-button {
+  min-height: 28px;
+}
+
+.runner-icon-button {
+  flex-basis: 28px;
+  width: 28px;
+}
+
+.floating-chat-anchor {
+  top: 10px;
+  right: max(8px, calc((100vw - 448px) / 2 + 8px));
+  left: auto;
+}
+
+.objective-popover {
+  top: 50px;
+  right: 0;
+  width: min(272px, 80vw);
+  max-width: 80vw;
+  padding: 9px 30px 9px 10px;
+  font-size: 12px;
+}
+
+@media (min-width: 640px) {
+  .karel-workspace {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .karel-board-panel {
+    max-height: 38dvh;
+    padding: 8px;
+  }
+
+  .karel-board-shell {
+    width: min(100%, 38dvh);
+  }
+
+  .karel-token {
+    width: min(28px, 76%);
+  }
+}
+
+@media (max-height: 720px) {
+  .karel-workspace {
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .karel-game-header {
+    min-height: 34px;
+  }
+
+  .karel-board-panel {
+    max-height: 34dvh;
+  }
+
+  .karel-board-shell {
+    width: min(100%, 34dvh);
+  }
+
+  .karel-editor-title {
+    font-size: 11px;
+  }
+
+  .karel-code-shell {
+    min-height: 118px;
+    max-height: 27dvh;
+  }
+}

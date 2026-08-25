@@ -29,6 +29,7 @@ type Statement =
 interface ParsedProgram {
   main: Statement[]
   procedures: Map<string, Statement[]>
+  endLineNumber: number
 }
 
 interface SourceLine {
@@ -46,6 +47,8 @@ const BASIC_COMMANDS = new Set<BasicCommand>([
 const CONDITIONS = new Set<Condition>(['frente-libre', 'junto-a-zumbador', 'orientado-al-norte'])
 const MAX_WHILE_ITERATIONS = 64
 const BASE_STEP_DELAY_MS = 600
+const MISSING_SHUTDOWN_MESSAGE =
+  "Error de Ejecucion: Karel no se apago formalmente. Debes incluir 'apagate;' antes de finalizar el programa."
 export type KarelSpeedMultiplier = 0.5 | 1 | 1.5 | 2
 
 const cloneWorld = (world: KarelWorldState): KarelWorldState => ({
@@ -212,12 +215,38 @@ const parseProgram = (code: string): { program?: ParsedProgram; result: CompileR
 
   const parsedMain = parseBlock(lines, startIndex + 1, procedures, endIndex)
   if (!parsedMain.success) return { result: parsedMain.result }
+  if (!statementsMayPowerOff(parsedMain.statements, procedures)) {
+    return {
+      result: {
+        success: false,
+        error: { line: lines[endIndex]?.lineNumber ?? lastLine.lineNumber, message: "Falta la instruccion 'apagate;' antes de 'termina-ejecucion'." },
+      },
+    }
+  }
 
   return {
-    program: { main: parsedMain.statements, procedures },
+    program: { main: parsedMain.statements, procedures, endLineNumber: lines[endIndex]?.lineNumber ?? lastLine.lineNumber },
     result: { success: true },
   }
 }
+
+const statementsMayPowerOff = (
+  statements: Statement[],
+  procedures: Map<string, Statement[]>,
+  visitedProcedures = new Set<string>(),
+): boolean =>
+  statements.some((statement) => {
+    if (statement.type === 'basic') return statement.command === 'apagate;'
+    if (statement.type === 'repeat' || statement.type === 'while' || statement.type === 'if') {
+      return statementsMayPowerOff(statement.body, procedures, visitedProcedures)
+    }
+    if (visitedProcedures.has(statement.name)) return false
+    const procedureBody = procedures.get(statement.name)
+    if (!procedureBody) return false
+
+    visitedProcedures.add(statement.name)
+    return statementsMayPowerOff(procedureBody, procedures, visitedProcedures)
+  })
 
 type ParseBlockResult =
   | { success: true; statements: Statement[]; nextIndex: number }
@@ -372,6 +401,9 @@ const createExecutionSteps = (program: ParsedProgram, initialWorld: KarelWorldSt
   }
 
   executeStatements(program.main)
+  if (!isPoweredOff && !steps.at(-1)?.error) {
+    pushStep(program.endLineNumber, 'termina-ejecucion', world, MISSING_SHUTDOWN_MESSAGE)
+  }
   return steps
 }
 
