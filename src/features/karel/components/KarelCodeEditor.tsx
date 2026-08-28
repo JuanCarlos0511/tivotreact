@@ -107,11 +107,17 @@ export function KarelCodeEditor({
       </div>
       {compileResult && (
         <div className={`karel-compile-status ${compileResult.success && !executionError ? 'success' : 'error'}`}>
-          {compileResult.success && !executionError
-            ? '✓ Compilacion exitosa. Codigo listo para ejecutar.'
-            : `✕ Error${compileResult.error ? ` en linea ${compileResult.error.line}` : ''}: ${
+          {compileResult.success && !executionError ? (
+            compileResult.warning ? (
+              `✓ Compilacion exitosa. ${compileResult.warning}`
+            ) : (
+              '✓ Compilacion exitosa. Codigo listo para ejecutar.'
+            )
+          ) : (
+            `✕ Error${compileResult.error ? ` en linea ${compileResult.error.line}` : ''}: ${
                 executionError ?? compileResult.error?.message ?? 'No se pudo ejecutar el programa'
-              }`}
+              }`
+          )}
         </div>
       )}
       <div className="karel-code-shell">

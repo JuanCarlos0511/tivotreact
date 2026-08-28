@@ -10,6 +10,7 @@ export interface ExecutionStep {
 
 export interface CompileResult {
   success: boolean
+  warning?: string
   error?: {
     line: number
     message: string
@@ -47,8 +48,8 @@ const BASIC_COMMANDS = new Set<BasicCommand>([
 const CONDITIONS = new Set<Condition>(['frente-libre', 'junto-a-zumbador', 'orientado-al-norte'])
 const MAX_WHILE_ITERATIONS = 64
 const BASE_STEP_DELAY_MS = 600
-const MISSING_SHUTDOWN_MESSAGE =
-  "Error de Ejecucion: Karel no se apago formalmente. Debes incluir 'apagate;' antes de finalizar el programa."
+const MISSING_SHUTDOWN_WARNING =
+  "Recordatorio: al terminar de usar a Karel, agrega 'apagate;' para cerrar formalmente el programa."
 export type KarelSpeedMultiplier = 0.5 | 1 | 1.5 | 2
 
 const cloneWorld = (world: KarelWorldState): KarelWorldState => ({
@@ -116,11 +117,11 @@ const applyCommand = (command: BasicCommand, world: KarelWorldState): { world: K
         beeper.avenue === nextWorld.karelPosition.avenue &&
         beeper.count > 0,
     )
-    if (beeperIndex < 0) return { world, error: 'Error: No hay zumbadores en esta esquina' }
+    if (beeperIndex < 0) return { world: nextWorld }
 
     const nextBeepers = [...nextWorld.beepers]
     const currentBeeper = nextBeepers[beeperIndex]
-    if (!currentBeeper) return { world, error: 'Error: No hay zumbadores en esta esquina' }
+    if (!currentBeeper) return { world: nextWorld }
 
     if (currentBeeper.count === 1) {
       nextBeepers.splice(beeperIndex, 1)
@@ -215,18 +216,11 @@ const parseProgram = (code: string): { program?: ParsedProgram; result: CompileR
 
   const parsedMain = parseBlock(lines, startIndex + 1, procedures, endIndex)
   if (!parsedMain.success) return { result: parsedMain.result }
-  if (!statementsMayPowerOff(parsedMain.statements, procedures)) {
-    return {
-      result: {
-        success: false,
-        error: { line: lines[endIndex]?.lineNumber ?? lastLine.lineNumber, message: "Falta la instruccion 'apagate;' antes de 'termina-ejecucion'." },
-      },
-    }
-  }
+  const warning = statementsMayPowerOff(parsedMain.statements, procedures) ? undefined : MISSING_SHUTDOWN_WARNING
 
   return {
     program: { main: parsedMain.statements, procedures, endLineNumber: lines[endIndex]?.lineNumber ?? lastLine.lineNumber },
-    result: { success: true },
+    result: warning ? { success: true, warning } : { success: true },
   }
 }
 
@@ -401,9 +395,6 @@ const createExecutionSteps = (program: ParsedProgram, initialWorld: KarelWorldSt
   }
 
   executeStatements(program.main)
-  if (!isPoweredOff && !steps.at(-1)?.error) {
-    pushStep(program.endLineNumber, 'termina-ejecucion', world, MISSING_SHUTDOWN_MESSAGE)
-  }
   return steps
 }
 

@@ -1,75 +1,76 @@
-import { ArrowLeft, CheckCircle2, Map, Play, Dice1 } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Map } from 'lucide-react'
 import type { KarelLevel } from '@shared/types'
 import { KAREL_LEVELS } from '@shared/catalog'
+import lvl1Icon from '../../assets/lvl1icon.png'
+import lvl2Icon from '../../assets/lvl2icon.png'
+import lvl3Icon from '../../assets/lvl3icon.png'
+import lvl4Icon from '../../assets/lvl4icon.png'
 
 interface LevelSelectGridProps {
   onBack: () => void
   onSelectLevel: (level: KarelLevel) => void
 }
 
+const LEVEL_ICONS: Record<number, string> = {
+  1: lvl1Icon,
+  2: lvl2Icon,
+  3: lvl3Icon,
+  4: lvl4Icon,
+}
+
 export function LevelSelectGrid({ onBack, onSelectLevel }: LevelSelectGridProps) {
   return (
-    <section className="navigation-screen level-select-screen">
-      <header className="level-select-header">
-        <button className="subtle-nav-button" type="button" onClick={onBack} aria-label="Volver">
-          <ArrowLeft size={17} />
+    <section className="h-[100dvh] max-w-md mx-auto flex flex-col justify-between p-4 bg-[#0a0f12] text-white select-none">
+      <header className="flex items-center gap-3 mb-4">
+        <button
+          className="bg-gray-900/80 border border-gray-700/50 rounded-xl p-2.5 hover:border-emerald-400 transition-colors"
+          type="button"
+          onClick={onBack}
+          aria-label="Volver"
+        >
+          <ArrowLeft className="w-5 h-5 text-gray-300" />
         </button>
         <div>
-          <p className="screen-kicker">Mapas de aprendizaje</p>
-          <h1>Selecciona un Mapa</h1>
+          <p className="text-[10px] font-mono font-bold text-emerald-400 tracking-wider uppercase">
+            MAPAS DE APRENDIZAJE
+          </p>
+          <h1 className="text-xl font-bold text-white">Selecciona un Mapa</h1>
         </div>
       </header>
-      <div className="level-grid" aria-label="Niveles de Karel">
-        {KAREL_LEVELS.map((level) => (
+      <div className="grid grid-cols-2 gap-3 flex-1" aria-label="Niveles de Karel">
+        {KAREL_LEVELS.slice(0, 4).map((level) => (
           <button
             key={level.id}
-            className={`level-card level-card-${level.gridPosition}`}
+            className="bg-gray-950/80 border border-emerald-500/20 rounded-2xl p-4 flex flex-col justify-between items-center text-center transition-all hover:border-emerald-400 active:scale-95 cursor-pointer shadow-lg"
             type="button"
             onClick={() => onSelectLevel(level)}
           >
-            <span className="level-card-topline">
-              <span className="level-number">Nivel {level.id}</span>
-              <CheckCircle2 size={15} />
+            <span className="w-full flex justify-between items-center">
+              <span className="text-[11px] font-bold text-emerald-400 tracking-wide font-mono">
+                NIVEL {level.id}
+              </span>
+              <CheckCircle2 className="text-emerald-400 w-4 h-4" />
             </span>
-            <span className="level-card-title">{level.title.replace(/^Nivel \d+: /, '')}</span>
-            <span className="level-card-description">{level.subtitle}</span>
-            <span className="level-command-list">
-              {level.commands.map((command) => (
-                <span key={command} className="level-command-chip">
-                  {command}
-                </span>
-              ))}
+
+            <span className="w-16 h-16 rounded-xl bg-black/40 border border-emerald-500/10 flex items-center justify-center overflow-hidden my-2 p-2">
+              <img
+                src={LEVEL_ICONS[level.id]}
+                alt={level.title}
+                className="w-full h-full object-contain"
+                draggable={false}
+              />
             </span>
-            <span className="level-status-badge">
-              <Map size={13} />
+
+            <span className="text-sm font-bold text-gray-100 leading-snug px-1 line-clamp-2">
+              {level.title.replace(/^Nivel \d+:\s*/, '')}
+            </span>
+
+            <span className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-emerald-400 mt-2">
+              <Map className="w-3.5 h-3.5" />
               Disponible
             </span>
           </button>
         ))}
-
-        {/* Arena libre / modo infinito: ocupa ancho completo del grid */}
-        <div className="arena-card" role="region" aria-label="Arena libre">
-          <div className="arena-header">
-            <div className="arena-eyebrow">ARENA LIBRE // MODO INFINITO</div>
-            <div className="arena-meta">[∞ MAPAS]</div>
-          </div>
-          <div className="arena-body">
-            <p className="arena-description">
-              Desafío Procedural
-              <br />
-              Algoritmos dinámicos en mundos generados al azar para probar tu lógica sin límites.
-            </p>
-            <div className="arena-actions">
-              <button type="button" className="arena-button">
-                <Dice1 size={14} /> Generador Aleatorio
-              </button>
-              <button type="button" className="arena-button">Sandbox</button>
-              <button type="button" className="arena-button primary">
-                <Play size={14} /> JUGAR
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
     </section>
   )

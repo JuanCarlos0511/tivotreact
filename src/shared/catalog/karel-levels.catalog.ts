@@ -1,13 +1,13 @@
 import type { KarelLevel } from '@shared/types'
 
-export const KAREL_LEVELS = [
+export const KAREL_LEVELS: KarelLevel[] = [
   {
     id: 1,
-    title: 'Nivel 1: Primeros Pasos',
-    subtitle: 'Mundo, orientacion y movimiento basico.',
-    objective: 'Avanza 3 esquinas hacia el Este y desconecta a Karel con apagate.',
+    title: "Nivel 1: Primeros Pasos",
+    subtitle: "Movimiento básico línea recta",
+    objective: "Avanza desde la esquina inferior izquierda (1,1) hasta la esquina inferior derecha (1,8) y apaga a Karel.",
     gridPosition: 'top-left',
-    commands: ['avanza;', 'gira-izquierda;', 'apagate;'],
+    commands: ['avanza;', 'apagate;'],
     initialWorld: {
       karelPosition: { street: 1, avenue: 1 },
       karelDirection: 'ESTE',
@@ -17,97 +17,95 @@ export const KAREL_LEVELS = [
     starterCode: `iniciar-programa
   inicia-ejecucion
     avanza;
-    avanza;
-    avanza;
     apagate;
   termina-ejecucion
 finalizar-programa`,
-    initialMessage:
-      '¡Hola! Soy tu tutor de Karel el Robot. Karel vive en un mundo de calles (horizontales) y avenidas (verticales). Tus primeros 3 comandos son:\n\n- `avanza;` (avanza 1 esquina)\n- `gira-izquierda;` (gira 90° a la izquierda)\n- `apagate;` (termina el programa)\n\n¿Listo para tu primer reto? Intenta escribir un programa que mueva a Karel 3 esquinas al frente y se apague.',
+    initialMessage: "¡Bienvenido a Karel el Robot! En este primer nivel aprenderás a moverte en línea recta. Tu meta es llevar a Karel desde la esquina (1,1) hasta la (1,8) utilizando únicamente la instrucción `avanza;` consecutivamente y terminar con `apagate;`.",
   },
   {
     id: 2,
-    title: 'Nivel 2: Mochila y Zumbadores',
-    subtitle: 'Recoger y depositar beepers en el mundo.',
-    objective: 'Ve a la esquina (1, 4), recoge el zumbador con coge-zumbador y regresa a tu cama (1, 1).',
+    title: "Nivel 2: Repeticiones",
+    subtitle: "Uso de bucles repetir/veces",
+    objective: "Llega de la esquina (1,1) a la (1,8) optimizando tu código con la estructura 'repetir N veces'.",
     gridPosition: 'top-right',
-    commands: ['coge-zumbador;', 'deja-zumbador;'],
+    commands: ['repetir N veces'],
     initialWorld: {
       karelPosition: { street: 1, avenue: 1 },
       karelDirection: 'ESTE',
-      beepers: [{ street: 1, avenue: 4, count: 1 }],
+      beepers: [],
       bagBeepers: 0,
     },
     starterCode: `iniciar-programa
   inicia-ejecucion
-    avanza;
-    coge-zumbador;
+    repetir 7 veces inicio
+      avanza;
+    fin;
     apagate;
   termina-ejecucion
 finalizar-programa`,
-    initialMessage:
-      '¡Bienvenido al Nivel 2! En este nivel aprenderemos a usar la mochila de Karel y los zumbadores (beepers):\n\n- `coge-zumbador;` (toma un zumbador de la esquina actual)\n- `deja-zumbador;` (deja un zumbador de la mochila en la esquina)\n\nRecuerda: si ordenas recoger un zumbador en una esquina vacía, Karel marcará error. ¿Quieres ver cómo resolver el problema del periódico?',
+    initialMessage: "¡Nivel 2! En lugar de escribir `avanza;` 7 veces seguidas, podemos usar una estructura de control para repetir instrucciones:\n\n```pascal\nrepetir 7 veces inicio\n  avanza;\nfin;\n```\n\nPrueba a compilar y ejecutar para ver cómo Karel recorre la calle con menos líneas de código.",
   },
   {
     id: 3,
-    title: 'Nivel 3: Repeticiones y Decisiones',
-    subtitle: 'Estructuras repetir/veces y si/entonces condicional.',
-    objective: 'Usa la sentencia repetir para recolectar los 3 zumbadores en linea recta.',
+    title: "Nivel 3: Decisiones y Contorno",
+    subtitle: "Recorrer el perímetro del mapa",
+    objective: "Recorre el contorno completo del mapa 8x8 dando la vuelta entera hasta regresar al inicio (1,1). Usa repeticiones para avanzar y decisiones con giros al llegar a cada pared.",
     gridPosition: 'bottom-left',
-    commands: ['repetir N veces', 'si <condicion> entonces'],
+    commands: ['si frente-bloqueado', 'gira-izq;'],
     initialWorld: {
-      karelPosition: { street: 2, avenue: 1 },
+      karelPosition: { street: 1, avenue: 1 },
+      karelDirection: 'ESTE',
+      beepers: [],
+      bagBeepers: 0,
+    },
+    starterCode: `iniciar-programa
+  inicia-ejecucion
+    repetir 4 veces inicio
+      repetir 7 veces inicio
+        avanza;
+      fin;
+      gira-izquierda;
+    fin;
+    apagate;
+  termina-ejecucion
+finalizar-programa`,
+    initialMessage: "¡Nivel 3! Tu objetivo es dar la vuelta completa por todo el borde del mundo hasta volver a (1,1). Utiliza la combinación de `repetir` para recorrer cada lado y aprovecha las decisiones o giros (`gira-izquierda;`) cada vez que llegues a una pared para continuar por el contorno.",
+  },
+  {
+    id: 4,
+    title: "Nivel 4: Mochilas y Fichas",
+    subtitle: "Recolección perimetral de fichas",
+    objective: "Da la vuelta completa por el contorno del mapa y recoge todas las fichas (zumbadores) que encuentres en el camino con 'coge-zumbador'.",
+    gridPosition: 'bottom-right',
+    commands: ['coge-zumbador;', 'junto-a-zumbador'],
+    initialWorld: {
+      karelPosition: { street: 1, avenue: 1 },
       karelDirection: 'ESTE',
       beepers: [
-        { street: 2, avenue: 2, count: 1 },
-        { street: 2, avenue: 3, count: 1 },
-        { street: 2, avenue: 4, count: 1 },
+        { street: 1, avenue: 4, count: 1 },
+        { street: 5, avenue: 8, count: 1 },
+        { street: 8, avenue: 3, count: 1 },
+        { street: 4, avenue: 1, count: 1 },
       ],
       bagBeepers: 0,
     },
     starterCode: `iniciar-programa
   inicia-ejecucion
-    repetir 3 veces inicio
-      avanza;
-      coge-zumbador;
-    fin;
-    apagate;
-  termina-ejecucion
-finalizar-programa`,
-    initialMessage:
-      '¡Entramos al Nivel 3! Para no repetir `avanza;` 10 veces manuales, usamos estructuras de control:\n\n```pascal\nrepetir 5 veces inicio\n   avanza;\nfin;\n```\n\nY para tomar decisiones según el entorno:\n```pascal\nsi junto-a-zumbador entonces inicio\n   coge-zumbador;\nfin;\n```\nCondiciones clave: `frente-libre`, `junto-a-zumbador`, `orientado-al-norte`.',
-  },
-  {
-    id: 4,
-    title: 'Nivel 4: Bucles y Procedimientos',
-    subtitle: 'Bucles mientras/hacer y nuevas instrucciones.',
-    objective: 'Crea la instruccion define-nueva-instruccion gira-derecha y recorre el pasillo con mientras frente-libre.',
-    gridPosition: 'bottom-right',
-    commands: ['mientras <condicion> hacer', 'define-nueva-instruccion'],
-    initialWorld: {
-      karelPosition: { street: 1, avenue: 1 },
-      karelDirection: 'ESTE',
-      beepers: [{ street: 5, avenue: 5, count: 1 }],
-      bagBeepers: 0,
-    },
-    starterCode: `iniciar-programa
-  define-nueva-instruccion gira-derecha como inicio
-    repetir 3 veces inicio
+    repetir 4 veces inicio
+      repetir 7 veces inicio
+        si junto-a-zumbador entonces inicio
+          coge-zumbador;
+        fin;
+        avanza;
+      fin;
       gira-izquierda;
     fin;
-  fin;
-
-  inicia-ejecucion
-    mientras frente-libre hacer inicio
-      avanza;
-    fin;
     apagate;
   termina-ejecucion
 finalizar-programa`,
-    initialMessage:
-      '¡Llegamos al Nivel 4! Karel puede adaptarse a distancias desconocidas con `mientras`:\n\n```pascal\nmientras frente-libre hacer inicio\n   avanza;\nfin;\n```\n\nAdemás, podemos enseñarle comandos nuevos como girar a la derecha:\n```pascal\ndefine-nueva-instruccion gira-derecha como inicio\n   repetir 3 veces inicio\n      gira-izquierda;\n   fin;\nfin;\n```\n¡Pregúntame cualquier duda o propón un problema!',
+    initialMessage: "¡Nivel 4: Mochilas y Fichas! En este nivel, mientras recorres el contorno encontrarás fichas (zumbadores) en el camino. Antes de avanzar en cada esquina, verifica con `si junto-a-zumbador` para recoger la ficha con `coge-zumbador;` y guardarla en tu mochila.",
   },
-] as const satisfies readonly KarelLevel[]
+]
 
 export const getKarelLevelById = (levelId: number): KarelLevel | null =>
   KAREL_LEVELS.find((level) => level.id === levelId) ?? null
