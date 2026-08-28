@@ -140,9 +140,15 @@ export function KarelCodeEditor({
         />
       </div>
       <div className="karel-editor-actions">
-        <button className="editor-secondary-button" type="button" onClick={onCompile} disabled={isRunning}>
-          Compilar
-        </button>
+        <div className="editor-primary-actions">
+          <button className="editor-secondary-button" type="button" onClick={onCompile} disabled={isRunning}>
+            Compilar
+          </button>
+          <button className="editor-run-button" type="button" onClick={onRun} disabled={isRunning}>
+            <Send size={15} />
+            {isRunning ? 'Ejecutando' : 'Ejecutar'}
+          </button>
+        </div>
         <div className="runner-control-group" aria-label="Controles de ejecucion">
           <button
             className="runner-icon-button"
@@ -184,10 +190,6 @@ export function KarelCodeEditor({
             x{speedMultiplier}
           </button>
         </div>
-        <button className="editor-run-button" type="button" onClick={onRun} disabled={isRunning}>
-          <Send size={15} />
-          {isRunning ? 'Ejecutando' : 'Ejecutar'}
-        </button>
       </div>
     </section>
   )

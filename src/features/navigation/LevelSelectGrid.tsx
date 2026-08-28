@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, Map } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Map, Play, Dice1 } from 'lucide-react'
 import type { KarelLevel } from '@shared/types'
 import { KAREL_LEVELS } from '@shared/catalog'
 
@@ -46,6 +46,30 @@ export function LevelSelectGrid({ onBack, onSelectLevel }: LevelSelectGridProps)
             </span>
           </button>
         ))}
+
+        {/* Arena libre / modo infinito: ocupa ancho completo del grid */}
+        <div className="arena-card" role="region" aria-label="Arena libre">
+          <div className="arena-header">
+            <div className="arena-eyebrow">ARENA LIBRE // MODO INFINITO</div>
+            <div className="arena-meta">[∞ MAPAS]</div>
+          </div>
+          <div className="arena-body">
+            <p className="arena-description">
+              Desafío Procedural
+              <br />
+              Algoritmos dinámicos en mundos generados al azar para probar tu lógica sin límites.
+            </p>
+            <div className="arena-actions">
+              <button type="button" className="arena-button">
+                <Dice1 size={14} /> Generador Aleatorio
+              </button>
+              <button type="button" className="arena-button">Sandbox</button>
+              <button type="button" className="arena-button primary">
+                <Play size={14} /> JUGAR
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   )
