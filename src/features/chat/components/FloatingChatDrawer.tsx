@@ -10,6 +10,9 @@ interface FloatingChatDrawerProps {
   isOpen: boolean
   objective: string
   showObjective: boolean
+  isIntroPrompt: boolean
+  onContinueIntro?: () => void
+  onDismissIntro?: () => void
   onOpen: () => void
   onClose: () => void
   onDismissObjective: () => void
@@ -26,6 +29,9 @@ export function FloatingChatDrawer({
   isOpen,
   objective,
   showObjective,
+  isIntroPrompt,
+  onContinueIntro,
+  onDismissIntro,
   onOpen,
   onClose,
   onDismissObjective,
@@ -36,6 +42,16 @@ export function FloatingChatDrawer({
 }: FloatingChatDrawerProps) {
   const messageEndRef = useRef<HTMLDivElement | null>(null)
   const latestAssistantMessageId = [...(session?.messages ?? [])].reverse().find((message) => message.role === 'assistant')?.id
+  const showIntroAttention = isIntroPrompt && showObjective && !isOpen
+
+  const handleDismissPrompt = () => {
+    if (isIntroPrompt && onDismissIntro) {
+      onDismissIntro()
+      return
+    }
+
+    onDismissObjective()
+  }
 
   useEffect(() => {
     if (!isOpen) return
@@ -43,7 +59,7 @@ export function FloatingChatDrawer({
   }, [isOpen, isResponding, session?.messages.length])
 
   const handleOpen = () => {
-    onDismissObjective()
+    handleDismissPrompt()
     onOpen()
   }
 
@@ -58,14 +74,30 @@ export function FloatingChatDrawer({
     <>
       <div className="floating-chat-anchor">
         {showObjective && !isOpen && (
-          <aside className="objective-popover" role="status">
-            <button type="button" aria-label="Cerrar objetivo" onClick={onDismissObjective}>
+          <aside className={`objective-popover ${isIntroPrompt ? 'tivot-intro-popover' : ''}`} role="status">
+            <button type="button" aria-label="Cerrar objetivo" onClick={handleDismissPrompt}>
               <X size={13} />
             </button>
+            {isIntroPrompt && <strong>Tutorial inicial</strong>}
             <p>{objective}</p>
+            {isIntroPrompt && onContinueIntro && (
+              <div className="tutorial-popover-actions">
+                <button className="tutorial-skip-button" type="button" onClick={handleDismissPrompt}>
+                  Omitir
+                </button>
+                <button className="tutorial-next-button" type="button" onClick={onContinueIntro}>
+                  Siguiente
+                </button>
+              </div>
+            )}
           </aside>
         )}
-        <button className="floating-chat-button" type="button" onClick={handleOpen} aria-label="Abrir chat tutor">
+        <button
+          className={`floating-chat-button ${showIntroAttention ? 'floating-chat-button-attention' : ''}`}
+          type="button"
+          onClick={handleOpen}
+          aria-label="Abrir chat tutor"
+        >
           <MessageCircle size={22} />
           <span className="chat-pulse-badge" aria-hidden="true" />
         </button>

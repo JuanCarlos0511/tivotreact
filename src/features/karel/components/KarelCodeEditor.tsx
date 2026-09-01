@@ -18,9 +18,29 @@ interface KarelCodeEditorProps {
   onStepBack: () => void
   onStepForward: () => void
   onSpeedChange: (speedMultiplier: KarelSpeedMultiplier) => void
+  tutorialFocus?: KarelTutorialFocus
+  onTutorialNext?: () => void
+  onTutorialDismiss?: () => void
 }
 
+type KarelTutorialFocus = 'code' | 'runner' | 'compile' | null
+
 const QUICK_COMMANDS = ['avanza;', 'gira-izquierda;', 'coge-zumbador;', 'deja-zumbador;', 'apagate;'] as const
+
+const TUTORIAL_COPY = {
+  code: {
+    title: 'Espacio de codigo',
+    body: 'Escribe aqui las instrucciones de Karel. En este nivel, enfocate en avanzar paso a paso y terminar con apagate;.',
+  },
+  runner: {
+    title: 'Controles paso a paso',
+    body: 'Usa estos botones para revisar la ejecucion: retrocede, pausa, avanza un paso y ajusta la velocidad.',
+  },
+  compile: {
+    title: 'Compilar y ejecutar',
+    body: 'Primero compila para revisar errores. Cuando el codigo este listo, ejecutalo para ver a Karel moverse.',
+  },
+} satisfies Record<NonNullable<KarelTutorialFocus>, { title: string; body: string }>
 
 const getNextSpeed = (currentSpeed: KarelSpeedMultiplier): KarelSpeedMultiplier => {
   const cycle: KarelSpeedMultiplier[] = [1, 1.5, 2, 0.5]
@@ -44,11 +64,16 @@ export function KarelCodeEditor({
   onStepBack,
   onStepForward,
   onSpeedChange,
+  tutorialFocus = null,
+  onTutorialNext,
+  onTutorialDismiss,
 }: KarelCodeEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const highlightRef = useRef<HTMLDivElement | null>(null)
   const [, forceFontRender] = useState(0)
   const lines = code.split('\n')
+  const tutorialCopy = tutorialFocus ? TUTORIAL_COPY[tutorialFocus] : null
+  const isLastTutorialStep = tutorialFocus === 'compile'
 
   useEffect(() => {
     if (!document.fonts) return
@@ -87,7 +112,12 @@ export function KarelCodeEditor({
   }
 
   return (
-    <section className="karel-editor-panel" aria-label="Editor de codigo Karel">
+    <section
+      className={`karel-editor-panel ${
+        tutorialFocus ? `karel-editor-panel-tutorial karel-editor-panel-tutorial-${tutorialFocus}` : ''
+      }`}
+      aria-label="Editor de codigo Karel"
+    >
       <div className="karel-editor-toolbar">
         <span className="karel-editor-title">
           <Terminal size={15} />
@@ -120,7 +150,7 @@ export function KarelCodeEditor({
           )}
         </div>
       )}
-      <div className="karel-code-shell">
+      <div className={`karel-code-shell ${tutorialFocus === 'code' ? 'tutorial-target-spotlight' : ''}`}>
         <div ref={highlightRef} className="karel-code-highlight" aria-hidden="true">
           {lines.map((line, index) => {
             const lineNumber = index + 1
@@ -147,15 +177,28 @@ export function KarelCodeEditor({
       </div>
       <div className="karel-editor-actions">
         <div className="editor-primary-actions">
-          <button className="editor-secondary-button" type="button" onClick={onCompile} disabled={isRunning}>
+          <button
+            className={`editor-secondary-button ${tutorialFocus === 'compile' ? 'tutorial-target-spotlight' : ''}`}
+            type="button"
+            onClick={onCompile}
+            disabled={isRunning}
+          >
             Compilar
           </button>
-          <button className="editor-run-button" type="button" onClick={onRun} disabled={isRunning}>
+          <button
+            className={`editor-run-button ${tutorialFocus === 'compile' ? 'tutorial-target-spotlight' : ''}`}
+            type="button"
+            onClick={onRun}
+            disabled={isRunning}
+          >
             <Send size={15} />
             {isRunning ? 'Ejecutando' : 'Ejecutar'}
           </button>
         </div>
-        <div className="runner-control-group" aria-label="Controles de ejecucion">
+        <div
+          className={`runner-control-group ${tutorialFocus === 'runner' ? 'tutorial-target-spotlight' : ''}`}
+          aria-label="Controles de ejecucion"
+        >
           <button
             className="runner-icon-button"
             type="button"
@@ -197,6 +240,20 @@ export function KarelCodeEditor({
           </button>
         </div>
       </div>
+      {tutorialFocus && tutorialCopy && (
+        <aside className={`tutorial-popover tutorial-popover-${tutorialFocus}`} role="status">
+          <strong>{tutorialCopy.title}</strong>
+          <p>{tutorialCopy.body}</p>
+          <div className="tutorial-popover-actions">
+            <button className="tutorial-skip-button" type="button" onClick={onTutorialDismiss}>
+              Omitir
+            </button>
+            <button className="tutorial-next-button" type="button" onClick={onTutorialNext}>
+              {isLastTutorialStep ? 'Finalizar' : 'Siguiente'}
+            </button>
+          </div>
+        </aside>
+      )}
     </section>
   )
 }

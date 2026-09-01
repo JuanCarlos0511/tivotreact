@@ -6,6 +6,10 @@ import { KarelGrid8x8 } from '@features/karel/components/KarelGrid8x8'
 import { useKarelRunner } from '@features/karel/hooks/use-karel-runner'
 import { FloatingChatDrawer } from './FloatingChatDrawer'
 
+type LevelOneTutorialStep = 'chat' | 'code' | 'runner' | 'compile'
+
+const LEVEL_ONE_TUTORIAL_STEPS: LevelOneTutorialStep[] = ['chat', 'code', 'runner', 'compile']
+
 interface ChatWorkspaceProps {
   session: TivotChatSession | null
   activeLevel: KarelLevel
@@ -32,14 +36,39 @@ export function ChatWorkspace({
   const [code, setCode] = useState(activeLevel.starterCode)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [showObjective, setShowObjective] = useState(true)
+  const [tutorialStep, setTutorialStep] = useState<LevelOneTutorialStep | null>(
+    activeLevel.id === 1 ? 'chat' : null,
+  )
   const runner = useKarelRunner(activeLevel.initialWorld)
+  const isChatTutorialStep = tutorialStep === 'chat'
+  const editorTutorialFocus = tutorialStep === 'code' || tutorialStep === 'runner' || tutorialStep === 'compile'
+    ? tutorialStep
+    : null
+  const chatPrompt = isChatTutorialStep
+    ? 'Conoce a Tivot: sera tu guia de apoyo para aprender a programar paso a paso durante este reto.'
+    : activeLevel.objective
 
   useEffect(() => {
     setCode(activeLevel.starterCode)
     setIsChatOpen(false)
     setShowObjective(true)
+    setTutorialStep(activeLevel.id === 1 ? 'chat' : null)
     runner.resetExecution()
   }, [activeLevel])
+
+  const advanceTutorial = () => {
+    if (!tutorialStep) return
+
+    const currentIndex = LEVEL_ONE_TUTORIAL_STEPS.indexOf(tutorialStep)
+    const nextStep = LEVEL_ONE_TUTORIAL_STEPS[currentIndex + 1] ?? null
+    setTutorialStep(nextStep)
+    setShowObjective(false)
+  }
+
+  const dismissTutorial = () => {
+    setTutorialStep(null)
+    setShowObjective(false)
+  }
 
   const resetCodeAndWorld = () => {
     setCode(activeLevel.starterCode)
@@ -52,7 +81,8 @@ export function ChatWorkspace({
   }
 
   return (
-    <section className="karel-workspace">
+    <section className={`karel-workspace ${tutorialStep ? 'karel-workspace-tutorial' : ''}`}>
+      {tutorialStep && <div className="tutorial-backdrop" aria-hidden="true" />}
       <header className="karel-game-header">
         <button className="workspace-back-button" type="button" onClick={onBackToLevels}>
           <ArrowLeft size={16} />
@@ -82,6 +112,9 @@ export function ChatWorkspace({
         onStepBack={runner.stepBack}
         onStepForward={() => runner.stepForward(code)}
         onSpeedChange={runner.setSpeedMultiplier}
+        tutorialFocus={editorTutorialFocus}
+        onTutorialNext={advanceTutorial}
+        onTutorialDismiss={dismissTutorial}
       />
 
       <FloatingChatDrawer
@@ -89,8 +122,11 @@ export function ChatWorkspace({
         query={query}
         isResponding={isResponding}
         isOpen={isChatOpen}
-        objective={activeLevel.objective}
-        showObjective={showObjective}
+        objective={chatPrompt}
+        showObjective={isChatTutorialStep || showObjective}
+        isIntroPrompt={isChatTutorialStep}
+        onContinueIntro={advanceTutorial}
+        onDismissIntro={dismissTutorial}
         onOpen={() => setIsChatOpen(true)}
         onClose={() => setIsChatOpen(false)}
         onDismissObjective={() => setShowObjective(false)}

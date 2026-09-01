@@ -1275,6 +1275,7 @@ button { cursor: pointer; }
 .karel-workspace {
   position: relative;
   z-index: 1;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1282,6 +1283,15 @@ button { cursor: pointer; }
   min-height: 100vh;
   margin: 0 auto;
   padding: 12px;
+}
+
+.tutorial-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  background: rgba(0, 0, 0, 0.64);
+  backdrop-filter: blur(1px);
+  animation: tutorial-backdrop-in 0.18s ease both;
 }
 
 .karel-game-header {
@@ -1426,9 +1436,54 @@ button { cursor: pointer; }
 }
 
 .karel-editor-panel {
+  position: relative;
   display: grid;
   gap: 10px;
   padding: 12px;
+}
+
+.karel-editor-panel-tutorial {
+  z-index: 7;
+  box-shadow: 0 20px 46px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+.karel-editor-panel-tutorial .karel-editor-toolbar,
+.karel-editor-panel-tutorial .quick-command-row,
+.karel-editor-panel-tutorial .karel-compile-status,
+.karel-editor-panel-tutorial .karel-code-shell,
+.karel-editor-panel-tutorial .editor-secondary-button,
+.karel-editor-panel-tutorial .editor-run-button,
+.karel-editor-panel-tutorial .runner-control-group {
+  transition: opacity 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.karel-editor-panel-tutorial-code .karel-editor-toolbar,
+.karel-editor-panel-tutorial-code .quick-command-row,
+.karel-editor-panel-tutorial-code .karel-compile-status,
+.karel-editor-panel-tutorial-code .editor-secondary-button,
+.karel-editor-panel-tutorial-code .editor-run-button,
+.karel-editor-panel-tutorial-code .runner-control-group,
+.karel-editor-panel-tutorial-runner .karel-editor-toolbar,
+.karel-editor-panel-tutorial-runner .quick-command-row,
+.karel-editor-panel-tutorial-runner .karel-compile-status,
+.karel-editor-panel-tutorial-runner .karel-code-shell,
+.karel-editor-panel-tutorial-runner .editor-secondary-button,
+.karel-editor-panel-tutorial-runner .editor-run-button,
+.karel-editor-panel-tutorial-compile .karel-editor-toolbar,
+.karel-editor-panel-tutorial-compile .quick-command-row,
+.karel-editor-panel-tutorial-compile .karel-compile-status,
+.karel-editor-panel-tutorial-compile .karel-code-shell,
+.karel-editor-panel-tutorial-compile .runner-control-group {
+  opacity: 0.36;
+  filter: saturate(0.74);
+}
+
+.tutorial-target-spotlight {
+  position: relative;
+  z-index: 9;
+  opacity: 1 !important;
+  filter: none !important;
+  animation: tutorial-neon-outline 1.05s ease-in-out infinite;
 }
 
 .karel-editor-title {
@@ -1527,6 +1582,21 @@ button { cursor: pointer; }
   border: 1px solid rgba(16, 185, 129, 0.2);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.6);
+}
+
+.karel-code-shell.tutorial-target-spotlight {
+  border-color: rgba(52, 211, 153, 0.92);
+}
+
+.karel-code-shell.tutorial-target-spotlight::after {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: 1px solid rgba(167, 243, 208, 0.74);
+  border-radius: inherit;
+  content: '';
+  pointer-events: none;
+  box-shadow: inset 0 0 22px rgba(52, 211, 153, 0.16);
 }
 
 .karel-code-highlight {
@@ -1687,6 +1757,130 @@ button { cursor: pointer; }
   background: #10b981;
 }
 
+.runner-control-group.tutorial-target-spotlight {
+  border-radius: 8px;
+  background: rgba(6, 78, 59, 0.18);
+}
+
+.runner-control-group.tutorial-target-spotlight > button {
+  border-color: rgba(52, 211, 153, 0.72);
+}
+
+.editor-secondary-button.tutorial-target-spotlight,
+.editor-run-button.tutorial-target-spotlight {
+  border-color: rgba(52, 211, 153, 0.86);
+}
+
+.tutorial-popover {
+  position: absolute;
+  z-index: 11;
+  width: min(304px, calc(100% - 20px));
+  padding: 12px 13px;
+  border: 1px solid rgba(52, 211, 153, 0.62);
+  border-radius: 8px;
+  color: #d1fae5;
+  background: rgba(4, 17, 13, 0.98);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.42), 0 0 28px rgba(16, 185, 129, 0.24);
+  animation: tutorial-popover-in 0.22s ease both;
+}
+
+.tutorial-popover::before {
+  position: absolute;
+  top: -7px;
+  right: 22px;
+  width: 12px;
+  height: 12px;
+  border-top: 1px solid rgba(52, 211, 153, 0.62);
+  border-left: 1px solid rgba(52, 211, 153, 0.62);
+  content: '';
+  background: rgba(4, 17, 13, 0.98);
+  transform: rotate(45deg);
+}
+
+.tutorial-popover-code {
+  top: 90px;
+  right: 18px;
+}
+
+.tutorial-popover-runner,
+.tutorial-popover-compile {
+  bottom: 52px;
+}
+
+.tutorial-popover-runner {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.tutorial-popover-compile {
+  right: 12px;
+}
+
+.tutorial-popover-runner::before,
+.tutorial-popover-compile::before {
+  top: auto;
+  bottom: -7px;
+  border-top: 0;
+  border-left: 0;
+  border-right: 1px solid rgba(52, 211, 153, 0.62);
+  border-bottom: 1px solid rgba(52, 211, 153, 0.62);
+}
+
+.tutorial-popover-runner::before {
+  right: 136px;
+}
+
+.tutorial-popover strong,
+.objective-popover.tivot-intro-popover strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #34d399;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+}
+
+.tutorial-popover p {
+  margin: 0;
+  color: #e9fff4;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.36;
+}
+
+.tutorial-popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.tutorial-skip-button,
+.tutorial-next-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.tutorial-skip-button {
+  border: 1px solid rgba(132, 147, 141, 0.32);
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.68);
+}
+
+.tutorial-next-button {
+  border: 0;
+  color: #04110b;
+  background: linear-gradient(180deg, #7cf5bc, #10b981);
+  box-shadow: 0 10px 22px rgba(16, 185, 129, 0.28);
+}
+
 .editor-secondary-button:disabled,
 .editor-run-button:disabled,
 .runner-icon-button:disabled,
@@ -1743,6 +1937,17 @@ button { cursor: pointer; }
   color: #d1fae5;
   background: rgba(4, 17, 13, 0.96);
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.32), 0 0 28px rgba(16, 185, 129, 0.22);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+
+.floating-chat-button-attention {
+  border-color: rgba(52, 211, 153, 0.95);
+  color: #ecfdf5;
+  animation: chat-neon-outline 1.05s ease-in-out infinite;
+}
+
+.floating-chat-button-attention svg {
+  filter: drop-shadow(0 0 8px rgba(52, 211, 153, 0.78));
 }
 
 .chat-pulse-badge {
@@ -1757,6 +1962,12 @@ button { cursor: pointer; }
   animation: chat-badge-pulse 1.4s ease-out infinite;
 }
 
+.floating-chat-button-attention .chat-pulse-badge {
+  background: #34d399;
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.95);
+  animation-duration: 0.95s;
+}
+
 .objective-popover {
   position: absolute;
   top: 56px;
@@ -1768,6 +1979,15 @@ button { cursor: pointer; }
   color: #d1fae5;
   background: rgba(4, 17, 13, 0.98);
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34);
+  z-index: 9;
+}
+
+.objective-popover.tivot-intro-popover {
+  width: 292px;
+  border-color: rgba(52, 211, 153, 0.62);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.38), 0 0 28px rgba(16, 185, 129, 0.24);
+  transform-origin: top right;
+  animation: tivot-intro-popover-in 0.24s ease both;
 }
 
 .objective-popover::before {
@@ -1783,6 +2003,11 @@ button { cursor: pointer; }
   transform: rotate(45deg);
 }
 
+.objective-popover.tivot-intro-popover::before {
+  border-color: rgba(52, 211, 153, 0.62);
+  box-shadow: -5px -5px 14px rgba(52, 211, 153, 0.12);
+}
+
 .objective-popover p {
   margin: 0;
   display: -webkit-box;
@@ -1795,7 +2020,13 @@ button { cursor: pointer; }
   -webkit-line-clamp: 2;
 }
 
-.objective-popover button,
+.objective-popover.tivot-intro-popover p {
+  color: #e9fff4;
+  font-size: 12.5px;
+  -webkit-line-clamp: 3;
+}
+
+.objective-popover > button,
 .floating-chat-header button {
   display: grid;
   place-items: center;
@@ -1804,7 +2035,7 @@ button { cursor: pointer; }
   background: transparent;
 }
 
-.objective-popover button {
+.objective-popover > button {
   position: absolute;
   top: 8px;
   right: 8px;
@@ -1886,6 +2117,61 @@ button { cursor: pointer; }
   }
 }
 
+@keyframes tutorial-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes chat-neon-outline {
+  0%,
+  100% {
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.32), 0 0 24px rgba(16, 185, 129, 0.28);
+  }
+  50% {
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.34), 0 0 8px rgba(52, 211, 153, 0.95),
+      0 0 26px rgba(52, 211, 153, 0.62), 0 0 48px rgba(16, 185, 129, 0.35);
+  }
+}
+
+@keyframes tutorial-neon-outline {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.36), 0 0 18px rgba(16, 185, 129, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(167, 243, 208, 0.95), 0 0 18px rgba(52, 211, 153, 0.72),
+      0 0 42px rgba(16, 185, 129, 0.38);
+  }
+}
+
+@keyframes tutorial-popover-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+    translate: 0 -6px;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes tivot-intro-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes drawer-in {
   from {
     opacity: 0;
@@ -1910,6 +2196,33 @@ button { cursor: pointer; }
 
   .objective-popover {
     width: min(236px, calc(100vw - 24px));
+  }
+
+  .objective-popover.tivot-intro-popover {
+    width: min(292px, calc(100vw - 24px));
+  }
+
+  .tutorial-popover {
+    width: min(292px, calc(100% - 16px));
+  }
+
+  .tutorial-popover-code {
+    top: 84px;
+    right: 8px;
+  }
+
+  .tutorial-popover-runner,
+  .tutorial-popover-compile {
+    right: 8px;
+    bottom: 46px;
+    left: 8px;
+    transform: none;
+  }
+
+  .tutorial-popover-runner::before,
+  .tutorial-popover-compile::before {
+    right: 50%;
+    transform: translateX(50%) rotate(45deg);
   }
 }
 
@@ -2136,5 +2449,14 @@ button { cursor: pointer; }
   .karel-code-shell {
     min-height: 118px;
     max-height: 27dvh;
+  }
+
+  .tutorial-popover-code {
+    top: 76px;
+  }
+
+  .tutorial-popover-runner,
+  .tutorial-popover-compile {
+    bottom: 42px;
   }
 }
