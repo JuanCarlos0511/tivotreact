@@ -17,8 +17,15 @@ export interface CompileResult {
   }
 }
 
-type BasicCommand = 'avanza;' | 'gira-izquierda;' | 'coge-zumbador;' | 'deja-zumbador;' | 'apagate;'
-type Condition = 'frente-libre' | 'junto-a-zumbador' | 'orientado-al-norte'
+type BasicCommand =
+  | 'avanza;'
+  | 'gira-izquierda;'
+  | 'coge-ficha;'
+  | 'deja-ficha;'
+  | 'coge-zumbador;'
+  | 'deja-zumbador;'
+  | 'apagate;'
+type Condition = 'frente-libre' | 'junto-a-ficha' | 'junto-a-zumbador' | 'orientado-al-norte'
 
 type Statement =
   | { type: 'basic'; command: BasicCommand; lineNumber: number }
@@ -41,11 +48,18 @@ interface SourceLine {
 const BASIC_COMMANDS = new Set<BasicCommand>([
   'avanza;',
   'gira-izquierda;',
+  'coge-ficha;',
+  'deja-ficha;',
   'coge-zumbador;',
   'deja-zumbador;',
   'apagate;',
 ])
-const CONDITIONS = new Set<Condition>(['frente-libre', 'junto-a-zumbador', 'orientado-al-norte'])
+const CONDITIONS = new Set<Condition>([
+  'frente-libre',
+  'junto-a-ficha',
+  'junto-a-zumbador',
+  'orientado-al-norte',
+])
 const MAX_WHILE_ITERATIONS = 64
 const BASE_STEP_DELAY_MS = 600
 const MISSING_SHUTDOWN_WARNING =
@@ -91,7 +105,7 @@ const hasBeeper = (world: KarelWorldState) =>
 
 const evaluateCondition = (condition: Condition, world: KarelWorldState): boolean => {
   if (condition === 'frente-libre') return isInsideWorld(getNextPosition(world))
-  if (condition === 'junto-a-zumbador') return hasBeeper(world)
+  if (condition === 'junto-a-ficha' || condition === 'junto-a-zumbador') return hasBeeper(world)
   return world.karelDirection === 'NORTE'
 }
 
@@ -110,7 +124,7 @@ const applyCommand = (command: BasicCommand, world: KarelWorldState): { world: K
     return { world: nextWorld }
   }
 
-  if (command === 'coge-zumbador;') {
+  if (command === 'coge-ficha;' || command === 'coge-zumbador;') {
     const beeperIndex = nextWorld.beepers.findIndex(
       (beeper) =>
         beeper.street === nextWorld.karelPosition.street &&
@@ -133,8 +147,8 @@ const applyCommand = (command: BasicCommand, world: KarelWorldState): { world: K
     return { world: nextWorld }
   }
 
-  if (command === 'deja-zumbador;') {
-    if (nextWorld.bagBeepers <= 0) return { world, error: 'Error: No tienes zumbadores en la mochila' }
+  if (command === 'deja-ficha;' || command === 'deja-zumbador;') {
+    if (nextWorld.bagBeepers <= 0) return { world, error: 'Error: No tienes fichas en la mochila' }
 
     const beeperIndex = nextWorld.beepers.findIndex(
       (beeper) =>

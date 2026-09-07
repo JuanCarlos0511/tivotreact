@@ -28,7 +28,7 @@ interface KarelCodeEditorProps {
   onTutorialDismiss: () => void
 }
 
-const QUICK_COMMANDS = ['avanza;', 'gira-izquierda;', 'coge-zumbador;', 'deja-zumbador;', 'apagate;'] as const
+const QUICK_COMMANDS = ['avanza;', 'gira-izquierda;', 'coge-ficha;', 'deja-ficha;', 'apagate;'] as const
 
 const TUTORIAL_COPY = {
   code: {
@@ -151,9 +151,10 @@ export function KarelCodeEditor({
         <View style={styles.primaryActions}>
           <ActionButton
             label="Compilar"
+            icon={<Terminal color={colors.accentStrong} size={16} />}
             onPress={onCompile}
             disabled={isRunning}
-            style={tutorialFocus === 'compile' && styles.spotlight}
+            style={[styles.compileButton, tutorialFocus === 'compile' && styles.spotlight]}
           />
           <ActionButton
             label={isRunning ? 'Ejecutando' : 'Ejecutar'}
@@ -166,7 +167,7 @@ export function KarelCodeEditor({
         </View>
 
         <View style={[styles.runnerControls, tutorialFocus === 'runner' && styles.spotlight]}>
-          <Pressable disabled={isRunning} onPress={onStepBack} style={[styles.runnerButton, isRunning && styles.disabled]}>
+          <Pressable disabled={isRunning} onPress={onStepBack} style={[styles.runnerButton, styles.stepBackButton, isRunning && styles.disabled]}>
             <StepBack color={colors.accentStrong} size={16} />
           </Pressable>
           <Pressable
@@ -180,6 +181,7 @@ export function KarelCodeEditor({
             <StepForward color={colors.accentStrong} size={16} />
           </Pressable>
           <Pressable onPress={() => onSpeedChange(getNextSpeed(speedMultiplier))} style={styles.speedButton}>
+            <Text style={styles.speedLabel}>Velocidad</Text>
             <Text style={styles.speedText}>x{speedMultiplier}</Text>
           </Pressable>
         </View>
@@ -329,6 +331,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  compileButton: {
+    borderColor: 'rgba(111, 240, 179, 0.52)',
+    backgroundColor: 'rgba(6, 78, 59, 0.36)',
+  },
   runnerControls: {
     minHeight: 42,
     flexDirection: 'row',
@@ -348,23 +354,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  stepBackButton: {
+    borderColor: 'rgba(148, 163, 184, 0.38)',
+    backgroundColor: 'rgba(15, 23, 42, 0.82)',
+  },
   pauseButton: {
     backgroundColor: colors.accentStrong,
     borderColor: colors.accentStrong,
   },
   speedButton: {
-    minWidth: 42,
+    minWidth: 78,
     height: 38,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.68)',
+    borderColor: 'rgba(139, 212, 255, 0.55)',
     borderRadius: 7,
-    backgroundColor: colors.accent,
+    backgroundColor: 'rgba(14, 116, 144, 0.34)',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  speedLabel: {
+    color: colors.muted,
+    fontSize: 8,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
   speedText: {
-    color: colors.accentDark,
+    color: '#8bd4ff',
     fontSize: 12,
     fontWeight: '900',
   },

@@ -24,8 +24,8 @@ REGLAS DEL MUNDO:
 - Karel ocupa una esquina identificada por avenida y calle.
 - Karel esta orientado al norte, sur, este u oeste.
 - avanza; falla si hay una pared o el limite del mundo al frente.
-- coge-zumbador; falla si no hay zumbador en la esquina actual.
-- deja-zumbador; falla si la mochila no tiene zumbadores.
+- coge-ficha; falla si no hay ficha en la esquina actual.
+- deja-ficha; falla si la mochila no tiene fichas.
 - No normalices choques ni errores: senalalos y pide corregirlos.
 
 FORMATO DE RESPUESTA:

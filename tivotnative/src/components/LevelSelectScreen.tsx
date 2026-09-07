@@ -50,13 +50,6 @@ export function LevelSelectScreen({ metrics, onBack, onSelectLevel }: LevelSelec
                 </View>
                 <Text style={styles.levelTitle}>{level.title.replace(/^Nivel \d+: /, '')}</Text>
                 <Text style={styles.levelDescription}>{level.subtitle}</Text>
-                <View style={styles.commandList}>
-                  {level.commands.map((command) => (
-                    <View key={command} style={styles.commandChip}>
-                      <Text style={styles.commandChipText}>{command}</Text>
-                    </View>
-                  ))}
-                </View>
                 <View style={styles.statusBadge}>
                   <Map color={colors.accentDark} size={14} />
                   <Text style={styles.statusBadgeText}>Disponible</Text>
@@ -189,25 +182,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 19,
     fontWeight: '700',
-  },
-  commandList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  commandChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.24)',
-    borderRadius: 6,
-    backgroundColor: 'rgba(6, 78, 59, 0.26)',
-  },
-  commandChipText: {
-    color: '#86efac',
-    fontFamily: 'monospace',
-    fontSize: 11,
-    fontWeight: '800',
   },
   statusBadge: {
     marginTop: 'auto',

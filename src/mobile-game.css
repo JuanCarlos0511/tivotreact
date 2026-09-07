@@ -1,0 +1,503 @@
+.start-tivot-icon {
+  display: block;
+  width: 112px;
+  height: 112px;
+  object-fit: contain;
+}
+
+.game-help-dialog {
+  inset: auto 0 0;
+  width: min(100%, 540px);
+  max-width: 100%;
+  max-height: min(80dvh, 600px);
+  margin: 0 auto;
+  padding: 0 16px max(16px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--panel-border);
+  border-radius: 20px 20px 0 0;
+  color: var(--text);
+  background: var(--panel-bg);
+  box-shadow: var(--panel-shadow);
+}
+
+.game-help-dialog::backdrop {
+  background: var(--modal-backdrop);
+  backdrop-filter: blur(3px);
+}
+
+.game-help-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.game-help-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.game-help-header button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--text);
+  background: var(--surface);
+}
+
+.game-help-content {
+  font-size: 14px;
+  line-height: 1.6;
+}
+.game-help-content .game-help-progress {
+  margin-top: 0;
+  color: var(--accent-ink);
+  font-size: 12px;
+}
+.game-help-objective {
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--success-soft);
+}
+.game-help-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 16px;
+}
+.game-help-dialog :is(.tutorial-skip-button, .tutorial-next-button) {
+  min-height: 44px;
+  font-size: 13px;
+}
+.game-help-dialog .tutorial-skip-button {
+  color: var(--text);
+  background: var(--surface);
+}
+.game-help-dialog button:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  /* Only the mounted game locks the viewport; entry and level selection still scroll. */
+  html.game-viewport-active,
+  .game-viewport-active body,
+  .game-viewport-active #root,
+  .karel-app-shell.game-screen-active {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  .karel-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: clamp(48px, 8dvh, 64px) minmax(0, 36dvh) minmax(0, 1fr);
+    align-items: stretch;
+    align-content: stretch;
+    gap: 0;
+    width: 100%;
+    height: 100dvh;
+    min-height: 0;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+    overflow: hidden;
+  }
+
+  .karel-game-header {
+    grid-template-columns: auto minmax(0, 1fr);
+    min-height: 0;
+    padding: 4px 58px 4px 8px;
+    gap: 8px;
+  }
+  .workspace-back-button {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 8px;
+  }
+  .workspace-back-button span {
+    display: none;
+  }
+  .workspace-level-copy {
+    min-width: 0;
+  }
+  .karel-game-header h1 {
+    overflow: hidden;
+    margin: 2px 0 0;
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .workspace-level-badge {
+    font-size: 10px;
+  }
+  .floating-chat-anchor {
+    top: calc(env(safe-area-inset-top) + 6px);
+    right: calc(env(safe-area-inset-right) + 8px);
+  }
+  .floating-chat-button {
+    width: 40px;
+    height: 40px;
+  }
+  .floating-chat-drawer {
+    height: min(76dvh, 650px);
+  }
+  .floating-chat-composer textarea {
+    font-size: 16px;
+  }
+
+  .karel-board-panel {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    justify-self: center;
+    width: min(calc(100% - 16px), 36dvh);
+    height: 100%;
+    max-height: 38dvh;
+    min-height: 0;
+    padding: 6px;
+    box-shadow: none;
+  }
+  .karel-board-meta {
+    margin-bottom: 4px;
+    font-size: 9px;
+    letter-spacing: 0;
+  }
+  .karel-board-shell {
+    grid-template-columns: 12px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) 12px;
+    justify-self: center;
+    width: auto;
+    max-width: 100%;
+    height: 100%;
+    min-height: 0;
+    aspect-ratio: 1;
+    gap: 3px;
+  }
+  .karel-grid {
+    width: 100%;
+    height: 100%;
+    grid-template-rows: repeat(8, minmax(0, 1fr));
+  }
+  .karel-cell {
+    min-height: 0;
+  }
+  .karel-token {
+    position: absolute;
+    width: 80%;
+    max-height: 90%;
+  }
+  .karel-token svg {
+    width: 65%;
+    height: 65%;
+  }
+  .karel-token span {
+    right: 0;
+    bottom: 0;
+    font-size: 8px;
+  }
+  .beeper-badge {
+    width: min(20px, 80%);
+    height: auto;
+    aspect-ratio: 1;
+    font-size: 9px;
+  }
+  .karel-street-labels,
+  .karel-avenue-labels {
+    font-size: 8px;
+  }
+
+  .karel-workspace .structured-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+  .structured-editor .karel-editor-toolbar,
+  .structured-editor .code-line-help,
+  .structured-editor .editor-column-caption {
+    display: none;
+  }
+  .structured-editor .code-editor-columns {
+    grid-template-columns: minmax(0, 38fr) minmax(0, 62fr);
+    flex: 1 1 0;
+    min-height: 0;
+    margin: 8px;
+    overflow: hidden;
+  }
+  .structured-editor :is(.command-library, .line-program) {
+    min-height: 0;
+    padding: 7px 5px;
+    border-bottom: 0;
+  }
+  .structured-editor .command-library {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--line);
+  }
+  .structured-editor .line-program {
+    border-right: 0;
+  }
+  .structured-editor .editor-column-heading {
+    flex: 0 0 auto;
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+  .structured-editor .editor-column-heading h2 {
+    font-size: 11px;
+  }
+  .structured-editor .editor-column-heading svg {
+    width: 13px;
+    height: 13px;
+  }
+  .structured-editor .editor-column-heading > span {
+    font-size: 9px;
+  }
+  .structured-editor .line-program-tools {
+    gap: 3px;
+    margin: 0 0 4px;
+  }
+  .structured-editor .line-program-tool-button {
+    min-height: 30px;
+    padding: 0 4px;
+    border-radius: 7px;
+    font-size: 10px;
+  }
+  .structured-editor .line-program-tool-button span {
+    display: inline;
+  }
+  .structured-editor .line-program-tool-button svg {
+    width: 14px;
+    height: 14px;
+  }
+  .structured-editor .command-library-list {
+    display: block;
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .structured-editor .command-category + .command-category {
+    margin-top: 12px;
+  }
+  .structured-editor .command-category h3 {
+    margin-bottom: 4px;
+    font-size: 9px;
+    letter-spacing: 0;
+  }
+  .structured-editor .command-block-button {
+    min-height: 44px;
+    padding: 7px 5px;
+    border-radius: 12px;
+    font-size: 11px;
+  }
+  .structured-editor .command-block-button code {
+    display: none;
+  }
+  .structured-editor .command-block-button > svg {
+    width: 12px;
+    height: 12px;
+  }
+  .structured-editor .code-line-list {
+    min-height: 0;
+    max-height: none;
+    padding: 3px 1px;
+    overscroll-behavior: contain;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  .structured-editor .code-line-block {
+    grid-template-columns: 21px minmax(0, 1fr);
+    min-height: 38px;
+    margin-bottom: 4px;
+  }
+  .structured-editor .code-line-input {
+    min-height: 36px;
+    font-size: 11px;
+  }
+  .structured-editor .code-line-input[readonly] {
+    color: var(--text);
+    cursor: pointer;
+  }
+  .structured-editor .code-line-fixed .code-line-input {
+    color: var(--muted);
+    font-size: 10px;
+  }
+  .structured-editor .code-line-input:not([readonly]) {
+    font-size: 16px;
+  }
+  .structured-editor .code-line-block:focus-visible {
+    outline: 2px solid var(--accent-blue-ink);
+    outline-offset: -2px;
+  }
+  .structured-editor .add-program-line {
+    flex: 0 0 auto;
+    min-height: 32px;
+    margin-top: 4px;
+    font-size: 11px;
+  }
+  .mobile-line-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 0 0 auto;
+    gap: 2px;
+    margin-bottom: 4px;
+  }
+  .mobile-line-toolbar > span {
+    margin-right: auto;
+    color: var(--accent-blue-ink);
+    font: 10px var(--code-font);
+  }
+  .mobile-line-toolbar button {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    color: var(--text);
+    background: var(--surface-raised);
+  }
+
+  .structured-editor .karel-compile-status {
+    max-height: 48px;
+    margin: 0 8px 6px;
+    padding: 6px 8px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  /* The last, non-scrolling row stays at the viewport bottom without covering code. */
+  .mobile-execution-dock {
+    flex: 0 0 auto;
+    width: 100%;
+    padding: 7px 8px max(7px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: var(--panel-bg);
+    box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.08);
+  }
+  .mobile-dock-primary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 6px;
+  }
+  .mobile-dock-primary button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 3px;
+    min-height: 48px;
+    min-width: 0;
+    padding: 4px 2px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    color: var(--text);
+    background: var(--surface);
+    font-size: 12px;
+    font-weight: 900;
+  }
+  .mobile-dock-primary .mobile-dock-compile {
+    flex-direction: row;
+    border-color: rgba(111, 240, 179, 0.42);
+    color: #d1fae5;
+    background: linear-gradient(180deg, rgba(6, 78, 59, 0.66), rgba(15, 23, 42, 0.86));
+  }
+  .mobile-dock-primary .mobile-dock-play {
+    flex-direction: row;
+    gap: 6px;
+    border: 0;
+    color: #04110b;
+    background: linear-gradient(180deg, #7cf5bc, #10b981);
+    font-size: 13px;
+  }
+  .mobile-dock-secondary {
+    display: grid;
+    grid-template-columns: 38px 38px 38px minmax(82px, 1fr);
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .mobile-dock-secondary button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 38px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--accent-ink);
+    background: var(--success-soft);
+    font-size: 10px;
+    font-weight: 900;
+  }
+  .mobile-dock-secondary .mobile-dock-step-back {
+    color: #dbeafe;
+    background: rgba(15, 23, 42, 0.74);
+  }
+  .mobile-dock-secondary .mobile-dock-pause {
+    color: #04110b;
+    background: linear-gradient(180deg, #bef264, #34d399);
+  }
+  .mobile-dock-secondary .mobile-dock-speed {
+    flex-direction: column;
+    gap: 1px;
+    padding: 0 6px;
+    border-color: rgba(139, 212, 255, 0.5);
+    color: #8bd4ff;
+    background: rgba(14, 116, 144, 0.22);
+  }
+  .mobile-dock-secondary .speed-button-label {
+    font-size: 8px;
+  }
+  .mobile-dock-secondary .speed-button-value {
+    color: #8bd4ff;
+    font-size: 12px;
+  }
+  .mobile-dock-utility {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .mobile-dock-utility button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 34px;
+    min-width: 0;
+    padding: 0 8px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+    background: var(--surface);
+    font-size: 11px;
+    font-weight: 900;
+  }
+  .control-command-backdrop {
+    padding: 12px;
+  }
+  .control-command-dialog {
+    align-self: center;
+    max-height: 88dvh;
+    padding: 14px;
+  }
+  .condition-option-button {
+    min-height: 64px;
+  }
+}

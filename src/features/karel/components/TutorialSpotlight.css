@@ -1,0 +1,64 @@
+.tutorial-spotlight {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.spotlight-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.spotlight-dimmer { fill: rgba(0, 5, 3, 0.78); }
+.spotlight-neon {
+  fill: none;
+  stroke: #7effc3;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 4px #34d399) drop-shadow(0 0 10px #10b981);
+  animation: spotlight-glow 1.8s ease-in-out infinite;
+}
+
+.spotlight-panel {
+  position: absolute;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  width: min(340px, calc(100vw - 24px));
+  padding: 12px;
+  border: 1px solid #34d399;
+  border-radius: 14px;
+  color: #e9fff4;
+  background: #081c14;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5), 0 0 18px rgba(52, 211, 153, 0.2);
+  pointer-events: auto;
+  outline: none;
+}
+
+.spotlight-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.spotlight-header > span { color: #7effc3; font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.spotlight-header button { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; color: #d1fae5; background: #143427; }
+.spotlight-copy { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.spotlight-copy h2 { margin: 0 0 8px; color: #7effc3; font-size: 16px; line-height: 1.3; }
+.spotlight-copy p { margin: 0; color: #e9fff4; font-size: 13px; line-height: 1.5; }
+.spotlight-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.spotlight-actions button { min-height: 40px; padding: 0 12px; border-radius: 8px; font-size: 12px; font-weight: 800; }
+.spotlight-secondary { border: 1px solid #38634e; color: #d1fae5; background: #143427; }
+.spotlight-actions .spotlight-next { border: 0; color: #04110b; background: linear-gradient(180deg, #7cf5bc, #10b981); }
+.spotlight-panel button:focus-visible { outline: 2px solid #a7f3d0; outline-offset: 2px; }
+
+@keyframes spotlight-glow {
+  0%, 100% { filter: drop-shadow(0 0 4px #34d399) drop-shadow(0 0 10px #10b981); }
+  50% { filter: drop-shadow(0 0 7px #6ee7b7) drop-shadow(0 0 16px #10b981); }
+}
+
+@media (max-width: 767px) {
+  .spotlight-actions button { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlight-neon { animation: none; }
+}

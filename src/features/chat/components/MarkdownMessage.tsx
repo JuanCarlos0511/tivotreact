@@ -54,9 +54,9 @@ const renderInlineMarkdown = (text: string): ReactNode[] =>
 
 const renderKeywordText = (text: string): ReactNode[] => {
   const keywordPattern =
-    /\b(avanza|gira-izquierda|apagate|coge-zumbador|deja-zumbador|repetir|veces|inicio|fin|si|entonces|mientras|hacer|define-nueva-instruccion|frente-libre|junto-a-zumbador|orientado-al-norte|calle|calles|avenida|avenidas|zumbador|zumbadores|norte|sur|este|oeste|if|while)\b/gi
+    /\b(avanza|gira-izquierda|apagate|coge-ficha|deja-ficha|coge-zumbador|deja-zumbador|repetir|veces|inicio|fin|si|entonces|mientras|hacer|define-nueva-instruccion|frente-libre|junto-a-ficha|junto-a-zumbador|orientado-al-norte|calle|calles|avenida|avenidas|ficha|fichas|norte|sur|este|oeste|if|while)\b/gi
   const exactKeywordPattern =
-    /^(avanza|gira-izquierda|apagate|coge-zumbador|deja-zumbador|repetir|veces|inicio|fin|si|entonces|mientras|hacer|define-nueva-instruccion|frente-libre|junto-a-zumbador|orientado-al-norte|calle|calles|avenida|avenidas|zumbador|zumbadores|norte|sur|este|oeste|if|while)$/i
+    /^(avanza|gira-izquierda|apagate|coge-ficha|deja-ficha|coge-zumbador|deja-zumbador|repetir|veces|inicio|fin|si|entonces|mientras|hacer|define-nueva-instruccion|frente-libre|junto-a-ficha|junto-a-zumbador|orientado-al-norte|calle|calles|avenida|avenidas|ficha|fichas|norte|sur|este|oeste|if|while)$/i
 
   return text
     .split(keywordPattern)

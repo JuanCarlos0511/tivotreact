@@ -75,9 +75,9 @@ finalizar-programa`,
     id: 4,
     title: "Nivel 4: Mochilas y Fichas",
     subtitle: "Recolección perimetral de fichas",
-    objective: "Da la vuelta completa por el contorno del mapa y recoge todas las fichas (zumbadores) que encuentres en el camino con 'coge-zumbador'.",
+    objective: "Da la vuelta completa por el contorno del mapa y recoge todas las fichas que encuentres en el camino con 'coge-ficha'.",
     gridPosition: 'bottom-right',
-    commands: ['coge-zumbador;', 'junto-a-zumbador'],
+    commands: ['coge-ficha;', 'junto-a-ficha'],
     initialWorld: {
       karelPosition: { street: 1, avenue: 1 },
       karelDirection: 'ESTE',
@@ -93,8 +93,8 @@ finalizar-programa`,
   inicia-ejecucion
     repetir 4 veces inicio
       repetir 7 veces inicio
-        si junto-a-zumbador entonces inicio
-          coge-zumbador;
+        si junto-a-ficha entonces inicio
+          coge-ficha;
         fin;
         avanza;
       fin;
@@ -103,9 +103,47 @@ finalizar-programa`,
     apagate;
   termina-ejecucion
 finalizar-programa`,
-    initialMessage: "¡Nivel 4: Mochilas y Fichas! En este nivel, mientras recorres el contorno encontrarás fichas (zumbadores) en el camino. Antes de avanzar en cada esquina, verifica con `si junto-a-zumbador` para recoger la ficha con `coge-zumbador;` y guardarla en tu mochila.",
+    initialMessage: "¡Nivel 4: Mochilas y Fichas! En este nivel, mientras recorres el contorno encontrarás fichas en el camino. Antes de avanzar en cada esquina, verifica con `si junto-a-ficha` para recoger la ficha con `coge-ficha;` y guardarla en tu mochila.",
   },
 ]
 
 export const getKarelLevelById = (levelId: number): KarelLevel | null =>
   KAREL_LEVELS.find((level) => level.id === levelId) ?? null
+
+export const createKarelChallenge = (): KarelLevel => {
+  const street = 1 + Math.floor(Math.random() * 8)
+  const startAvenue = 1 + Math.floor(Math.random() * 4)
+  const difficulty = 1 + Math.floor(Math.random() * 3)
+  const avenues = Array.from({ length: 9 - startAvenue }, (_, index) => startAvenue + index)
+  // Sample distinct corners so every generated map is reachable with the existing runner.
+  const beepers = Array.from({ length: difficulty + 1 }, () => {
+    const index = Math.floor(Math.random() * avenues.length)
+    const avenue = avenues.splice(index, 1)[0] ?? startAvenue
+    return { street, avenue, count: difficulty === 3 ? 2 : 1 }
+  })
+  const difficultyLabel = ['Inicial', 'Intermedia', 'Avanzada'][difficulty - 1] ?? 'Inicial'
+  const objective = `Recoge todas las fichas de la calle ${street}, llega a la avenida 8 y apaga a Karel. Empiezas en la avenida ${startAvenue}, mirando al este.`
+
+  return {
+    id: -Date.now(),
+    mode: 'challenge',
+    title: 'Recolección dinámica',
+    subtitle: `Dificultad ${difficultyLabel.toLowerCase()}`,
+    objective,
+    gridPosition: 'bottom-right',
+    commands: ['avanza;', 'coge-ficha;', 'junto-a-ficha', 'frente-libre', 'mientras', 'apagate;'],
+    initialWorld: {
+      karelPosition: { street, avenue: startAvenue },
+      karelDirection: 'ESTE',
+      beepers,
+      bagBeepers: 0,
+    },
+    starterCode: `iniciar-programa
+  inicia-ejecucion
+    avanza;
+    apagate;
+  termina-ejecucion
+finalizar-programa`,
+    initialMessage: `Desafío de dificultad ${difficultyLabel.toLowerCase()}. ${objective} Observa cuántas fichas hay en cada esquina y usa decisiones o bucles para recogerlas antes de avanzar.`,
+  }
+}

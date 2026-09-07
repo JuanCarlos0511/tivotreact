@@ -5,7 +5,7 @@ const themeStorageKey = 'tivot-theme'
 export const getInitialTheme = (): ThemeMode => {
   const storedTheme = window.localStorage.getItem(themeStorageKey)
   if (storedTheme === 'light' || storedTheme === 'dark') return storedTheme
-  return 'dark'
+  return 'light'
 }
 
 export const applyTheme = (theme: ThemeMode): void => {

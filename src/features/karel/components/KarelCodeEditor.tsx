@@ -1,52 +1,88 @@
-import { Pause, Play, RotateCcw, Send, StepBack, StepForward, Terminal } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-import type { CompileResult, KarelSpeedMultiplier } from '@features/karel/hooks/use-karel-runner'
+import {
+  ArrowDown,
+  ArrowUp,
+  BookOpen,
+  Check,
+  Code2,
+  Lightbulb,
+  Pause,
+  Pencil,
+  Play,
+  Plus,
+  Redo2,
+  RotateCcw,
+  StepBack,
+  StepForward,
+  Terminal,
+  Trash2,
+  Undo2,
+  X,
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import type { ClipboardEvent, KeyboardEvent } from 'react';
+import type { CompileResult, KarelSpeedMultiplier } from '@features/karel/hooks/use-karel-runner';
+import {
+  COMMAND_TEMPLATES,
+  describeCodeLines,
+  getCustomCommands,
+  getInsertionIndex,
+  getSiblingIndex,
+  moveCodeBlock,
+  removeCodeBlock,
+} from '../editor/code-lines';
+import type { CommandTemplate } from '../editor/code-lines';
+import { TUTORIAL_COPY } from '../editor/tutorial';
+import './KarelCodeEditor.css';
 
 interface KarelCodeEditorProps {
-  code: string
-  activeLineNumber: number | null
-  compileResult: CompileResult | null
-  executionError: string | null
-  isRunning: boolean
-  isPaused: boolean
-  speedMultiplier: KarelSpeedMultiplier
-  onChange: (code: string) => void
-  onCompile: () => void
-  onRun: () => void
-  onReset: () => void
-  onPauseToggle: () => void
-  onStepBack: () => void
-  onStepForward: () => void
-  onSpeedChange: (speedMultiplier: KarelSpeedMultiplier) => void
-  tutorialFocus?: KarelTutorialFocus
-  onTutorialNext?: () => void
-  onTutorialDismiss?: () => void
+  code: string;
+  activeLineNumber: number | null;
+  compileResult: CompileResult | null;
+  executionError: string | null;
+  isRunning: boolean;
+  isPaused: boolean;
+  speedMultiplier: KarelSpeedMultiplier;
+  isMobile: boolean;
+  onHelp: () => void;
+  onChange: (code: string) => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onCompile: () => void;
+  onRun: () => void;
+  onReset: () => void;
+  onPauseToggle: () => void;
+  onStepBack: () => void;
+  onStepForward: () => void;
+  onSpeedChange: (speedMultiplier: KarelSpeedMultiplier) => void;
+  tutorialFocus?: KarelTutorialFocus;
+  onTutorialNext?: () => void;
+  onTutorialPrevious?: () => void;
+  onTutorialDismiss?: () => void;
 }
 
-type KarelTutorialFocus = 'code' | 'runner' | 'compile' | null
+type KarelTutorialFocus = 'code' | 'runner' | 'compile' | null;
 
-const QUICK_COMMANDS = ['avanza;', 'gira-izquierda;', 'coge-zumbador;', 'deja-zumbador;', 'apagate;'] as const
-
-const TUTORIAL_COPY = {
-  code: {
-    title: 'Espacio de codigo',
-    body: 'Escribe aqui las instrucciones de Karel. En este nivel, enfocate en avanzar paso a paso y terminar con apagate;.',
+const COMMAND_GROUPS = ['Movimiento', 'Fichas', 'Control', 'Mis instrucciones'] as const;
+const SPEEDS: KarelSpeedMultiplier[] = [1, 1.5, 2, 0.5];
+const CONDITION_OPTIONS = [
+  {
+    value: 'frente-libre',
+    label: 'Frente libre',
+    description: 'El siguiente cruce no está fuera del mundo.',
   },
-  runner: {
-    title: 'Controles paso a paso',
-    body: 'Usa estos botones para revisar la ejecucion: retrocede, pausa, avanza un paso y ajusta la velocidad.',
+  {
+    value: 'junto-a-ficha',
+    label: 'Junto a ficha',
+    description: 'Hay al menos una ficha en la esquina actual.',
   },
-  compile: {
-    title: 'Compilar y ejecutar',
-    body: 'Primero compila para revisar errores. Cuando el codigo este listo, ejecutalo para ver a Karel moverse.',
+  {
+    value: 'orientado-al-norte',
+    label: 'Orientado al norte',
+    description: 'Karel está mirando hacia el norte.',
   },
-} satisfies Record<NonNullable<KarelTutorialFocus>, { title: string; body: string }>
-
-const getNextSpeed = (currentSpeed: KarelSpeedMultiplier): KarelSpeedMultiplier => {
-  const cycle: KarelSpeedMultiplier[] = [1, 1.5, 2, 0.5]
-  const currentIndex = cycle.indexOf(currentSpeed)
-  return cycle[(currentIndex + 1) % cycle.length] ?? 1
-}
+] as const;
 
 export function KarelCodeEditor({
   code,
@@ -56,7 +92,13 @@ export function KarelCodeEditor({
   isRunning,
   isPaused,
   speedMultiplier,
+  isMobile,
+  onHelp,
   onChange,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
   onCompile,
   onRun,
   onReset,
@@ -66,194 +108,776 @@ export function KarelCodeEditor({
   onSpeedChange,
   tutorialFocus = null,
   onTutorialNext,
+  onTutorialPrevious,
   onTutorialDismiss,
 }: KarelCodeEditorProps) {
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
-  const highlightRef = useRef<HTMLDivElement | null>(null)
-  const [, forceFontRender] = useState(0)
-  const lines = code.split('\n')
-  const tutorialCopy = tutorialFocus ? TUTORIAL_COPY[tutorialFocus] : null
-  const isLastTutorialStep = tutorialFocus === 'compile'
+  const [selectedLine, setSelectedLine] = useState<number | null>(null);
+  const [editingLine, setEditingLine] = useState<number | null>(null);
+  const [pendingCommand, setPendingCommand] = useState<CommandTemplate | null>(null);
+  const [selectedCondition, setSelectedCondition] =
+    useState<(typeof CONDITION_OPTIONS)[number]['value']>('frente-libre');
+  const [repeatCount, setRepeatCount] = useState(2);
+  const [procedureName, setProcedureName] = useState('mi-instruccion');
+  const programRef = useRef<HTMLOListElement>(null);
+  const tutorialRef = useRef<HTMLElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const focusRequestRef = useRef<number | null>(null);
+  const lines = code.split('\n');
+  const descriptions = describeCodeLines(code);
+  const commands = [...COMMAND_TEMPLATES, ...getCustomCommands(descriptions)];
+  const selected = selectedLine === null ? undefined : descriptions[selectedLine];
+  const selectedCommandId = selected?.text.split(/[\s;]/)[0]?.replace('-zumbador', '-ficha');
+  const selectedCommand = commands.find(
+    (command) => selectedCommandId === command.id
+  );
+  const pendingCommandNeedsCondition = pendingCommand?.id === 'si' || pendingCommand?.id === 'mientras';
+  const repeatCountIsValid = Number.isFinite(repeatCount) && repeatCount >= 1;
+  const procedureNameIsValid = /^[a-zA-Z][\w-]*$/.test(procedureName.trim());
+  const tutorialCopy = tutorialFocus ? TUTORIAL_COPY[tutorialFocus] : null;
+  const insertionIndex =
+    isMobile && selected && !selected.fixed && !selected.opensBlock
+      ? (selectedLine ?? 0)
+      : getInsertionIndex(descriptions, selected ? selectedLine : null);
+  const hasError = Boolean(executionError || (compileResult && !compileResult.success));
+  const errorLine = executionError ? activeLineNumber : compileResult?.error?.line;
 
   useEffect(() => {
-    if (!document.fonts) return
+    const lineIndex = activeLineNumber === null ? selectedLine : activeLineNumber - 1;
+    if (lineIndex === null) return;
+    const list = programRef.current;
+    const row = list?.children[lineIndex] as HTMLElement | undefined;
+    if (!list || !row) return;
+    // Scroll only the program, keeping the map and playback controls in place.
+    const offset = row.getBoundingClientRect().top - list.getBoundingClientRect().top;
+    if (offset < 0) list.scrollTop += offset;
+    else if (offset + row.offsetHeight > list.clientHeight)
+      list.scrollTop += offset + row.offsetHeight - list.clientHeight;
+  }, [activeLineNumber, selectedLine, code]);
 
-    void document.fonts.ready.then(() => {
-      forceFontRender((current) => current + 1)
-    })
-  }, [])
+  useEffect(() => {
+    const target =
+      tutorialFocus === 'runner' || tutorialFocus === 'compile'
+        ? actionsRef.current
+        : tutorialRef.current;
+    target?.scrollIntoView({ block: 'nearest' });
+  }, [tutorialFocus]);
 
-  const syncHighlightScroll = () => {
-    const textarea = textareaRef.current
-    const highlight = highlightRef.current
-    if (!textarea || !highlight) return
+  useEffect(
+    () => () => {
+      if (focusRequestRef.current !== null) window.cancelAnimationFrame(focusRequestRef.current);
+    },
+    []
+  );
 
-    highlight.scrollTop = textarea.scrollTop
-    highlight.scrollLeft = textarea.scrollLeft
-  }
+  useEffect(() => {
+    if (!pendingCommand) return undefined;
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') setPendingCommand(null);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [pendingCommand]);
 
-  const insertCommand = (command: string) => {
-    const textarea = textareaRef.current
-    if (!textarea) {
-      onChange(`${code}\n${command}`)
-      return
+  const selectLine = (index: number) => {
+    if (focusRequestRef.current !== null) window.cancelAnimationFrame(focusRequestRef.current);
+    focusRequestRef.current = null;
+    setSelectedLine(index);
+  };
+
+  const resetProgram = () => {
+    if (focusRequestRef.current !== null) window.cancelAnimationFrame(focusRequestRef.current);
+    focusRequestRef.current = null;
+    setSelectedLine(null);
+    setEditingLine(null);
+    if (programRef.current) programRef.current.scrollTop = 0;
+    onReset();
+  };
+
+  const focusLine = (index: number, edit = !isMobile) => {
+    selectLine(index);
+    setEditingLine(edit ? index : null);
+    focusRequestRef.current = window.requestAnimationFrame(() => {
+      focusRequestRef.current = null;
+      const input = programRef.current?.querySelector<HTMLInputElement>(
+        `[data-line-input="${index}"]`
+      );
+      // Chip insertion and reordering must not summon the phone's software keyboard.
+      (edit ? input : input?.closest('li'))?.focus({ preventScroll: true });
+    });
+  };
+
+  const insertLines = (source: string[], index = insertionIndex, replaceSelection = true) => {
+    if (isRunning) return;
+    const selectedDescription =
+      selectedLine === null ? undefined : descriptions[selectedLine];
+    const replacesSelection = Boolean(
+      replaceSelection && selectedDescription && !selectedDescription.fixed
+    );
+    const targetIndex = replacesSelection ? selectedLine ?? index : index;
+    const previous = descriptions[targetIndex - 1];
+    const depth = replacesSelection
+      ? selectedDescription?.depth ?? 2
+      : previous?.opensBlock
+        ? previous.depth + 1
+        : (descriptions[targetIndex]?.depth ?? 2);
+    const nextLines = [...lines];
+    const nextSource = source.map((line) => `${'  '.repeat(depth)}${line}`);
+    if (replacesSelection) {
+      const endIndex = selectedDescription?.end ?? targetIndex;
+      nextLines.splice(targetIndex, endIndex - targetIndex + 1, ...nextSource);
+    } else {
+      nextLines.splice(targetIndex, 0, ...nextSource);
     }
+    onChange(nextLines.join('\n'));
+    focusLine(Math.min(targetIndex, nextLines.length - 1));
+  };
 
-    const selectionStart = textarea.selectionStart
-    const selectionEnd = textarea.selectionEnd
-    const nextCode = `${code.slice(0, selectionStart)}${command}${code.slice(selectionEnd)}`
-    onChange(nextCode)
+  const insertCommand = (command: CommandTemplate) => {
+    if (['si', 'mientras', 'repetir', 'define-nueva-instruccion'].includes(command.id)) {
+      setPendingCommand(command);
+      if (command.id === 'si' || command.id === 'mientras') setSelectedCondition('frente-libre');
+      if (command.id === 'repetir') setRepeatCount(2);
+      if (command.id === 'define-nueva-instruccion') {
+        let name = 'mi-instruccion';
+        let suffix = 2;
+        while (commands.some((entry) => entry.id === name)) name = `mi-instruccion-${suffix++}`;
+        setProcedureName(name);
+      }
+      return;
+    }
+    insertLines(command.source);
+  };
 
-    window.requestAnimationFrame(() => {
-      textarea.focus()
-      const nextCursor = selectionStart + command.length
-      textarea.setSelectionRange(nextCursor, nextCursor)
-    })
-  }
+  const getConditionBodyLine = () => {
+    if (selectedCondition === 'junto-a-ficha') return 'coge-ficha;';
+    if (selectedCondition === 'orientado-al-norte') return 'gira-izquierda;';
+    return 'avanza;';
+  };
+
+  const getPendingCommandSource = () => {
+    if (!pendingCommand) return [];
+    if (pendingCommand.id === 'si') {
+      return [`si ${selectedCondition} entonces inicio`, `  ${getConditionBodyLine()}`, 'fin;'];
+    }
+    if (pendingCommand.id === 'mientras') {
+      return [`mientras ${selectedCondition} hacer inicio`, `  ${getConditionBodyLine()}`, 'fin;'];
+    }
+    if (pendingCommand.id === 'repetir') {
+      return [`repetir ${Math.max(1, Math.floor(repeatCount))} veces inicio`, '  avanza;', 'fin;'];
+    }
+    if (pendingCommand.id === 'define-nueva-instruccion') {
+      const name = procedureNameIsValid ? procedureName.trim() : 'mi-instruccion';
+      return pendingCommand.source.map((line) => line.replace('mi-instruccion', name));
+    }
+    return pendingCommand.source;
+  };
+
+  const insertConfiguredCommand = () => {
+    if (!pendingCommand) return;
+    if (pendingCommand.id === 'repetir' && !repeatCountIsValid) return;
+    if (pendingCommand.id === 'define-nueva-instruccion' && !procedureNameIsValid) return;
+    if (pendingCommand.id !== 'define-nueva-instruccion') {
+      insertLines(getPendingCommandSource());
+      setPendingCommand(null);
+      return;
+    }
+    const mainIndex = descriptions.findIndex((line) => line.text === 'inicia-ejecucion');
+    insertLines(getPendingCommandSource(), Math.max(1, mainIndex), false);
+    setPendingCommand(null);
+  };
+
+  const updateLine = (index: number, value: string) => {
+    if (isRunning) return;
+    const nextLines = [...lines];
+    const indentation = lines[index]?.match(/^\s*/)?.[0] ?? '';
+    nextLines[index] = `${indentation}${value}`;
+    onChange(nextLines.join('\n'));
+  };
+
+  const moveLine = (index: number, direction: -1 | 1) => {
+    if (isRunning) return;
+    const result = moveCodeBlock(code, index, direction);
+    onChange(result.code);
+    focusLine(result.selected);
+  };
+
+  const deleteLine = (index: number) => {
+    if (isRunning) return;
+    const nextCode = removeCodeBlock(code, index);
+    onChange(nextCode);
+    focusLine(Math.min(index, nextCode.split('\n').length - 1));
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>, index: number) => {
+    if (event.nativeEvent.isComposing) return;
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      insertLines([''], getInsertionIndex(descriptions, index), false);
+    } else if (event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+      event.preventDefault();
+      moveLine(index, event.key === 'ArrowUp' ? -1 : 1);
+    }
+  };
+
+  const handlePaste = (event: ClipboardEvent<HTMLInputElement>, index: number) => {
+    const pasted = event.clipboardData.getData('text').replace(/\r\n?/g, '\n');
+    if (!pasted.includes('\n') || isRunning) return;
+    event.preventDefault();
+    const input = event.currentTarget;
+    const merged =
+      input.value.slice(0, input.selectionStart ?? 0) +
+      pasted +
+      input.value.slice(input.selectionEnd ?? input.value.length);
+    const indentation = lines[index]?.match(/^\s*/)?.[0] ?? '';
+    const nextLines = [...lines];
+    const pastedLines = merged.split('\n');
+    nextLines.splice(index, 1, ...pastedLines.map((line) => `${indentation}${line}`));
+    onChange(nextLines.join('\n'));
+    focusLine(index + pastedLines.length - 1);
+  };
 
   return (
     <section
-      className={`karel-editor-panel ${
-        tutorialFocus ? `karel-editor-panel-tutorial karel-editor-panel-tutorial-${tutorialFocus}` : ''
-      }`}
-      aria-label="Editor de codigo Karel"
+      className={`karel-editor-panel structured-editor ${tutorialFocus ? `karel-editor-panel-tutorial karel-editor-panel-tutorial-${tutorialFocus}` : ''}`}
+      aria-label="Editor de código Karel"
     >
       <div className="karel-editor-toolbar">
         <span className="karel-editor-title">
-          <Terminal size={15} />
-          Codigo Karel Pascal
+          <Terminal size={17} /> Código Karel Pascal
         </span>
-        <button className="editor-reset-button" type="button" onClick={onReset}>
-          <RotateCcw size={14} />
-          Reiniciar
+        <button className="editor-reset-button" type="button" onClick={resetProgram}>
+          <RotateCcw size={14} /> Reiniciar
         </button>
       </div>
-      <div className="quick-command-row" aria-label="Comandos rapidos">
-        {QUICK_COMMANDS.map((command) => (
-          <button key={command} type="button" className="quick-command-chip" onClick={() => insertCommand(command)}>
-            {command}
-          </button>
-        ))}
-      </div>
-      {compileResult && (
-        <div className={`karel-compile-status ${compileResult.success && !executionError ? 'success' : 'error'}`}>
-          {compileResult.success && !executionError ? (
-            compileResult.warning ? (
-              `✓ Compilacion exitosa. ${compileResult.warning}`
-            ) : (
-              '✓ Compilacion exitosa. Codigo listo para ejecutar.'
-            )
-          ) : (
-            `✕ Error${compileResult.error ? ` en linea ${compileResult.error.line}` : ''}: ${
-                executionError ?? compileResult.error?.message ?? 'No se pudo ejecutar el programa'
-              }`
+
+      <div
+        className={`code-editor-columns ${tutorialFocus === 'code' ? 'tutorial-target-spotlight' : ''}`}
+      >
+        <section className="command-library" aria-labelledby="command-library-title">
+          <header className="editor-column-heading">
+            <Plus size={16} />
+            <h2 id="command-library-title">Comandos</h2>
+          </header>
+          <p className="editor-column-caption">Pulsa para añadir al programa.</p>
+          <div className="command-library-list">
+            {COMMAND_GROUPS.map((group) => (
+              <div className="command-category" key={group}>
+                <h3>{group}</h3>
+                {commands
+                  .filter((command) => command.group === group)
+                  .map((command) => (
+                    <button
+                      className="command-block-button"
+                      type="button"
+                      key={command.id}
+                      onClick={() => insertCommand(command)}
+                      disabled={isRunning}
+                      title={command.description}
+                      aria-label={`Añadir ${command.label.toLowerCase()}`}
+                    >
+                      <span>
+                        {command.label}
+                        <code>{command.source[0]}</code>
+                      </span>
+                      <Plus size={13} aria-hidden="true" />
+                    </button>
+                  ))}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="line-program" aria-labelledby="line-program-title">
+          <header className="editor-column-heading">
+            <Code2 size={16} />
+            <h2 id="line-program-title">Programa</h2>
+            <span>{lines.length} líneas</span>
+          </header>
+          <div className="line-program-tools" role="group" aria-label="Acciones del código">
+            <button
+              className="line-program-tool-button"
+              type="button"
+              onClick={onUndo}
+              disabled={isRunning || !canUndo}
+              title="Deshacer cambio"
+              aria-label="Deshacer cambio en el código"
+            >
+              <Undo2 size={14} />
+              <span>Deshacer</span>
+            </button>
+            <button
+              className="line-program-tool-button"
+              type="button"
+              onClick={onRedo}
+              disabled={isRunning || !canRedo}
+              title="Rehacer cambio"
+              aria-label="Rehacer cambio en el código"
+            >
+              <Redo2 size={14} />
+              <span>Rehacer</span>
+            </button>
+          </div>
+          {isMobile && (
+            <div
+              className="mobile-line-toolbar"
+              role="group"
+              aria-label="Acciones de la línea seleccionada"
+            >
+              <span>{selected ? `L${(selectedLine ?? 0) + 1}` : 'Línea'}</span>
+              <button
+                type="button"
+                aria-label="Subir línea seleccionada"
+                disabled={
+                  isRunning ||
+                  selectedLine === null ||
+                  getSiblingIndex(descriptions, selectedLine, -1) === null
+                }
+                onClick={() => selectedLine !== null && moveLine(selectedLine, -1)}
+              >
+                <ArrowUp size={16} />
+              </button>
+              <button
+                type="button"
+                aria-label="Bajar línea seleccionada"
+                disabled={
+                  isRunning ||
+                  selectedLine === null ||
+                  getSiblingIndex(descriptions, selectedLine, 1) === null
+                }
+                onClick={() => selectedLine !== null && moveLine(selectedLine, 1)}
+              >
+                <ArrowDown size={16} />
+              </button>
+              <button
+                type="button"
+                aria-label="Eliminar línea seleccionada"
+                disabled={isRunning || !selected || selected.fixed}
+                onClick={() => selectedLine !== null && deleteLine(selectedLine)}
+              >
+                <Trash2 size={16} />
+              </button>
+              <button
+                type="button"
+                aria-label="Editar línea seleccionada"
+                disabled={isRunning || !selected || selected.fixed}
+                onClick={() => selectedLine !== null && focusLine(selectedLine, true)}
+              >
+                <Pencil size={16} />
+              </button>
+            </div>
           )}
+          <p className="editor-column-caption" id="line-program-hint">
+            {isRunning
+              ? 'Programa en ejecución. Pausa para editar.'
+              : selected && !selected.fixed
+                ? `El siguiente comando reemplazará ${selected.opensBlock ? 'el bloque' : 'la línea'} ${selectedLine === null ? '' : selectedLine + 1}.`
+                : `El siguiente comando se insertará antes de la línea ${insertionIndex + 1}.`}
+          </p>
+          <ol className="code-line-list" ref={programRef} aria-describedby="line-program-hint">
+            {descriptions.map((line, index) => {
+              const active = activeLineNumber === index + 1;
+              const invalid = hasError && errorLine === index + 1;
+              return (
+                <li
+                  key={index}
+                  className={`code-line-block ${line.fixed ? 'code-line-fixed' : ''} ${selectedLine === index ? 'selected' : ''} ${active ? 'active' : ''} ${invalid ? 'invalid' : ''}`}
+                  aria-current={active ? 'step' : undefined}
+                  tabIndex={-1}
+                  onClick={isMobile ? () => selectLine(index) : undefined}
+                >
+                  <span className="code-line-number" aria-hidden="true">
+                    {index + 1}
+                    {active && <Play size={8} />}
+                  </span>
+                  <input
+                    data-line-input={index}
+                    className="code-line-input"
+                    style={{
+                      paddingInlineStart: `${Math.min(line.depth, isMobile ? 3 : 5) * (isMobile ? 3 : 10) + 4}px`,
+                    }}
+                    aria-label={`Línea ${index + 1}${line.fixed ? ', estructura del programa' : ''}`}
+                    aria-invalid={invalid}
+                    aria-describedby={invalid ? 'karel-compile-result' : undefined}
+                    value={lines[index]?.trimStart() ?? ''}
+                    readOnly={line.fixed || isRunning || (isMobile && editingLine !== index)}
+                    spellCheck={false}
+                    autoComplete="off"
+                    autoCapitalize="off"
+                    placeholder="Escribe una instrucción…"
+                    onFocus={() => selectLine(index)}
+                    onBlur={() => setEditingLine(null)}
+                    onDoubleClick={() => {
+                      if (isMobile && !line.fixed && !isRunning) focusLine(index, true);
+                    }}
+                    onChange={(event) => updateLine(index, event.target.value)}
+                    onKeyDown={(event) => {
+                      if (!line.fixed) handleKeyDown(event, index);
+                    }}
+                    onPaste={(event) => {
+                      if (!line.fixed) handlePaste(event, index);
+                    }}
+                  />
+                  {!line.fixed && !isMobile && (
+                    <div className="code-line-actions">
+                      <button
+                        type="button"
+                        aria-label={`Subir línea ${index + 1}`}
+                        title="Subir bloque (Alt + ↑)"
+                        disabled={isRunning || getSiblingIndex(descriptions, index, -1) === null}
+                        onClick={() => moveLine(index, -1)}
+                      >
+                        <ArrowUp size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Bajar línea ${index + 1}`}
+                        title="Bajar bloque (Alt + ↓)"
+                        disabled={isRunning || getSiblingIndex(descriptions, index, 1) === null}
+                        onClick={() => moveLine(index, 1)}
+                      >
+                        <ArrowDown size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Eliminar línea ${index + 1}${line.opensBlock ? ' y su bloque' : ''}`}
+                        title={line.opensBlock ? 'Eliminar bloque completo' : 'Eliminar línea'}
+                        disabled={isRunning}
+                        onClick={() => deleteLine(index)}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+          <button
+            className="add-program-line"
+            type="button"
+            onClick={() => insertLines([''], insertionIndex, false)}
+            disabled={isRunning}
+          >
+            <Plus size={14} /> Añadir línea
+          </button>
+        </section>
+
+        <aside className="code-line-help" aria-labelledby="code-line-help-title">
+          <header className="editor-column-heading">
+            <BookOpen size={16} />
+            <h2 id="code-line-help-title">Ayuda</h2>
+          </header>
+          <div className="code-help-content" aria-live="polite">
+            <span className="code-help-kicker">
+              {selected ? `Línea ${(selectedLine ?? 0) + 1}` : 'Paso a paso'}
+            </span>
+            <h3>
+              {selectedCommand?.label ??
+                (selected?.fixed ? 'Estructura del programa' : 'Cada línea, una instrucción')}
+            </h3>
+            <p>
+              {selectedCommand?.description ??
+                (selected?.fixed
+                  ? 'Estas líneas delimitan el programa y sus bloques. Al añadir, mover o eliminar un bloque, su cierre lo acompaña.'
+                  : 'Elige un comando para añadirlo. Selecciona y edita una línea para adaptar el programa a tu objetivo.')}
+            </p>
+            {selectedCommand && (
+              <pre>
+                <code>{selectedCommand.source.join('\n')}</code>
+              </pre>
+            )}
+            <div className="code-help-tip">
+              <strong>Organiza tu solución</strong>
+              <p>
+                Las flechas mueven líneas o bloques completos. Enter añade una línea. También puedes
+                pegar varias instrucciones.
+              </p>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      {(compileResult || executionError) && (
+        <div
+          id="karel-compile-result"
+          role={hasError ? 'alert' : 'status'}
+          className={`karel-compile-status ${hasError ? 'error' : 'success'}`}
+        >
+          {hasError
+            ? `Error${errorLine ? ` en línea ${errorLine}` : ''}: ${executionError ?? compileResult?.error?.message ?? 'No se pudo ejecutar el programa.'}`
+            : `✓ Compilación exitosa. ${compileResult?.warning ?? 'Código listo para ejecutar.'}`}
         </div>
       )}
-      <div className={`karel-code-shell ${tutorialFocus === 'code' ? 'tutorial-target-spotlight' : ''}`}>
-        <div ref={highlightRef} className="karel-code-highlight" aria-hidden="true">
-          {lines.map((line, index) => {
-            const lineNumber = index + 1
-            const isActive = activeLineNumber === lineNumber
 
-            return (
-              <div key={`${lineNumber}-${line}`} className={`karel-code-row ${isActive ? 'active' : ''}`}>
-                <span className="karel-line-number">{lineNumber}</span>
-                <code>{line || ' '}</code>
-              </div>
-            )
-          })}
-        </div>
-        <textarea
-          ref={textareaRef}
-          className="karel-code-textarea"
-          value={code}
-          onChange={(event) => onChange(event.target.value)}
-          onScroll={syncHighlightScroll}
-          spellCheck={false}
-          wrap="off"
-          rows={11}
-        />
-      </div>
-      <div className="karel-editor-actions">
-        <div className="editor-primary-actions">
-          <button
-            className={`editor-secondary-button ${tutorialFocus === 'compile' ? 'tutorial-target-spotlight' : ''}`}
-            type="button"
-            onClick={onCompile}
-            disabled={isRunning}
-          >
-            Compilar
-          </button>
-          <button
-            className={`editor-run-button ${tutorialFocus === 'compile' ? 'tutorial-target-spotlight' : ''}`}
-            type="button"
-            onClick={onRun}
-            disabled={isRunning}
-          >
-            <Send size={15} />
-            {isRunning ? 'Ejecutando' : 'Ejecutar'}
-          </button>
-        </div>
-        <div
-          className={`runner-control-group ${tutorialFocus === 'runner' ? 'tutorial-target-spotlight' : ''}`}
-          aria-label="Controles de ejecucion"
+      {tutorialCopy && (
+        <aside
+          ref={tutorialRef}
+          className={`tutorial-popover tutorial-popover-${tutorialFocus}`}
+          role="status"
         >
-          <button
-            className="runner-icon-button"
-            type="button"
-            onClick={onStepBack}
-            disabled={isRunning}
-            aria-label="Retroceder un paso"
-            title="Retroceder un paso"
-          >
-            <StepBack size={14} />
-          </button>
-          <button
-            className="runner-icon-button runner-pause-button"
-            type="button"
-            onClick={onPauseToggle}
-            disabled={!isRunning && !isPaused}
-            aria-label={isPaused ? 'Reanudar ejecucion' : 'Pausar ejecucion'}
-            title={isPaused ? 'Reanudar ejecucion' : 'Pausar ejecucion'}
-          >
-            {isPaused ? <Play size={14} /> : <Pause size={14} />}
-          </button>
-          <button
-            className="runner-icon-button"
-            type="button"
-            onClick={onStepForward}
-            disabled={isRunning}
-            aria-label="Avanzar un paso"
-            title="Avanzar un paso"
-          >
-            <StepForward size={14} />
-          </button>
-          <button
-            className="runner-speed-button active"
-            type="button"
-            onClick={() => onSpeedChange(getNextSpeed(speedMultiplier))}
-            aria-label={`Velocidad actual x${speedMultiplier}. Pulsar para cambiar.`}
-            title={`Velocidad actual x${speedMultiplier}`}
-          >
-            x{speedMultiplier}
-          </button>
-        </div>
-      </div>
-      {tutorialFocus && tutorialCopy && (
-        <aside className={`tutorial-popover tutorial-popover-${tutorialFocus}`} role="status">
           <strong>{tutorialCopy.title}</strong>
           <p>{tutorialCopy.body}</p>
           <div className="tutorial-popover-actions">
             <button className="tutorial-skip-button" type="button" onClick={onTutorialDismiss}>
               Omitir
             </button>
+            <button className="tutorial-skip-button" type="button" onClick={onTutorialPrevious}>
+              Anterior
+            </button>
             <button className="tutorial-next-button" type="button" onClick={onTutorialNext}>
-              {isLastTutorialStep ? 'Finalizar' : 'Siguiente'}
+              {tutorialFocus === 'compile' ? 'Finalizar' : 'Siguiente'}
             </button>
           </div>
         </aside>
       )}
+
+      {isMobile ? (
+        <div className="mobile-execution-dock" role="group" aria-label="Controles de ejecución">
+          <div className="mobile-dock-primary">
+            <button
+              className="mobile-dock-compile"
+              type="button"
+              onClick={onCompile}
+              disabled={isRunning}
+            >
+              <Terminal size={16} />
+              <span>Compilar</span>
+            </button>
+            <button
+              className="mobile-dock-play"
+              type="button"
+              onClick={onRun}
+              disabled={isRunning}
+            >
+              <Play size={20} />
+              <span>{isRunning ? 'Ejecutando' : 'Ejecutar'}</span>
+            </button>
+          </div>
+          <div className="mobile-dock-secondary">
+            <button
+              className="mobile-dock-step-back"
+              type="button"
+              onClick={onStepBack}
+              disabled={isRunning}
+              aria-label="Retroceder un paso"
+              title="Retroceder un paso"
+            >
+              <StepBack size={16} />
+            </button>
+            <button
+              className="mobile-dock-pause"
+              type="button"
+              onClick={onPauseToggle}
+              disabled={!isRunning && !isPaused}
+              aria-label={isPaused ? 'Reanudar ejecución' : 'Pausar ejecución'}
+              title={isPaused ? 'Reanudar ejecución' : 'Pausar ejecución'}
+            >
+              {isPaused ? <Play size={16} /> : <Pause size={16} />}
+            </button>
+            <button
+              className="mobile-dock-step-forward"
+              type="button"
+              onClick={onStepForward}
+              disabled={isRunning}
+              aria-label="Avanzar un paso"
+              title="Avanzar un paso"
+            >
+              <StepForward size={16} />
+            </button>
+            <button
+              className="mobile-dock-speed"
+              type="button"
+              onClick={() =>
+                onSpeedChange(SPEEDS[(SPEEDS.indexOf(speedMultiplier) + 1) % SPEEDS.length] ?? 1)
+              }
+              aria-label={`Velocidad actual x${speedMultiplier}. Pulsar para cambiar.`}
+            >
+              <span className="speed-button-label">Velocidad</span>
+              <span className="speed-button-value">×{speedMultiplier}</span>
+            </button>
+          </div>
+          <div className="mobile-dock-utility">
+            <button type="button" onClick={resetProgram}>
+              <RotateCcw size={16} />
+              <span>Reiniciar</span>
+            </button>
+            <button type="button" onClick={onHelp} aria-haspopup="dialog">
+              <Lightbulb size={16} />
+              <span>Ayuda</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          ref={actionsRef}
+          className={`karel-editor-actions ${tutorialFocus === 'runner' ? 'tutorial-target-spotlight' : ''}`}
+        >
+          <div className="editor-primary-actions">
+            <button
+              className={`editor-secondary-button ${tutorialFocus === 'compile' ? 'tutorial-target-spotlight' : ''}`}
+              type="button"
+              onClick={onCompile}
+              disabled={isRunning}
+            >
+              <Terminal size={15} />
+              Compilar
+            </button>
+            <button
+              className={`editor-run-button ${tutorialFocus === 'compile' ? 'tutorial-target-spotlight' : ''}`}
+              type="button"
+              onClick={onRun}
+              disabled={isRunning}
+            >
+              <Play size={15} />
+              {isRunning ? 'Ejecutando' : 'Ejecutar'}
+            </button>
+          </div>
+          <div
+            className="runner-control-group"
+            role="group"
+            aria-label="Controles de tiempo y paso a paso"
+          >
+            <button
+              className="runner-icon-button runner-step-back-button"
+              type="button"
+              onClick={onStepBack}
+              disabled={isRunning}
+              aria-label="Retroceder un paso"
+              title="Retroceder un paso"
+            >
+              <StepBack size={16} />
+            </button>
+            <button
+              className="runner-icon-button runner-pause-button"
+              type="button"
+              onClick={onPauseToggle}
+              disabled={!isRunning && !isPaused}
+              aria-label={isPaused ? 'Reanudar ejecución' : 'Pausar ejecución'}
+              title={isPaused ? 'Reanudar ejecución' : 'Pausar ejecución'}
+            >
+              {isPaused ? <Play size={16} /> : <Pause size={16} />}
+            </button>
+            <button
+              className="runner-icon-button"
+              type="button"
+              onClick={onStepForward}
+              disabled={isRunning}
+              aria-label="Avanzar un paso"
+              title="Avanzar un paso"
+            >
+              <StepForward size={16} />
+            </button>
+            <button
+              className="runner-speed-button active"
+              type="button"
+              onClick={() =>
+                onSpeedChange(SPEEDS[(SPEEDS.indexOf(speedMultiplier) + 1) % SPEEDS.length] ?? 1)
+              }
+              aria-label={`Velocidad actual x${speedMultiplier}. Pulsar para cambiar.`}
+              title="Cambiar velocidad"
+            >
+              <span className="speed-button-label">Velocidad</span>
+              <span className="speed-button-value">×{speedMultiplier}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {pendingCommand && (
+        <div
+          className="control-command-backdrop"
+          role="presentation"
+          onMouseDown={() => setPendingCommand(null)}
+        >
+          <section
+            className="control-command-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="control-command-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="control-command-header">
+              <div>
+                <span>{pendingCommand.group}</span>
+                <h2 id="control-command-title">{pendingCommand.label}</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPendingCommand(null)}
+                aria-label="Cerrar configuración"
+              >
+                <X size={17} />
+              </button>
+            </header>
+
+            {pendingCommandNeedsCondition && (
+              <div className="condition-option-grid" role="radiogroup" aria-label="Condición">
+                {CONDITION_OPTIONS.map((condition) => (
+                  <button
+                    className={`condition-option-button ${selectedCondition === condition.value ? 'selected' : ''}`}
+                    type="button"
+                    role="radio"
+                    aria-checked={selectedCondition === condition.value}
+                    key={condition.value}
+                    onClick={() => setSelectedCondition(condition.value)}
+                  >
+                    <span>{condition.label}</span>
+                    <code>{condition.value}</code>
+                    <small>{condition.description}</small>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {pendingCommand.id === 'repetir' && (
+              <label className="control-command-field">
+                <span>Veces</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={64}
+                  value={repeatCount}
+                  onChange={(event) => setRepeatCount(Number(event.target.value))}
+                />
+              </label>
+            )}
+
+            {pendingCommand.id === 'define-nueva-instruccion' && (
+              <label className="control-command-field">
+                <span>Nombre</span>
+                <input
+                  type="text"
+                  value={procedureName}
+                  onChange={(event) => setProcedureName(event.target.value)}
+                  spellCheck={false}
+                />
+              </label>
+            )}
+
+            <pre className="control-command-preview">
+              <code>{getPendingCommandSource().join('\n')}</code>
+            </pre>
+
+            <div className="control-command-actions">
+              <button className="control-command-cancel" type="button" onClick={() => setPendingCommand(null)}>
+                Cancelar
+              </button>
+              <button
+                className="control-command-confirm"
+                type="button"
+                onClick={insertConfiguredCommand}
+                disabled={
+                  (pendingCommand.id === 'repetir' && !repeatCountIsValid) ||
+                  (pendingCommand.id === 'define-nueva-instruccion' && !procedureNameIsValid)
+                }
+              >
+                <Check size={15} />
+                Insertar
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </section>
-  )
+  );
 }

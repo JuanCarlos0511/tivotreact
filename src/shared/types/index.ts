@@ -209,6 +209,7 @@ export interface KarelWorldState {
 
 export interface KarelLevel {
   id: number
+  mode?: 'challenge'
   title: string
   subtitle: string
   objective: string

@@ -1,6 +1,6 @@
-import { ArrowLeft, CheckCircle2, Map, Play, Dice1 } from 'lucide-react'
+import { ArrowLeft, Play } from 'lucide-react'
 import type { KarelLevel } from '@shared/types'
-import { KAREL_LEVELS } from '@shared/catalog'
+import { createKarelChallenge, KAREL_LEVELS } from '@shared/catalog'
 
 interface LevelSelectGridProps {
   onBack: () => void
@@ -14,10 +14,7 @@ export function LevelSelectGrid({ onBack, onSelectLevel }: LevelSelectGridProps)
         <button className="subtle-nav-button" type="button" onClick={onBack} aria-label="Volver">
           <ArrowLeft size={17} />
         </button>
-        <div>
-          <p className="screen-kicker">Mapas de aprendizaje</p>
-          <h1>Selecciona un Mapa</h1>
-        </div>
+        <h1>Seleccionar nivel</h1>
       </header>
       <div className="level-grid" aria-label="Niveles de Karel">
         {KAREL_LEVELS.map((level) => (
@@ -29,43 +26,27 @@ export function LevelSelectGrid({ onBack, onSelectLevel }: LevelSelectGridProps)
           >
             <span className="level-card-topline">
               <span className="level-number">Nivel {level.id}</span>
-              <CheckCircle2 size={15} />
             </span>
             <span className="level-card-title">{level.title.replace(/^Nivel \d+: /, '')}</span>
             <span className="level-card-description">{level.subtitle}</span>
-            <span className="level-command-list">
-              {level.commands.map((command) => (
-                <span key={command} className="level-command-chip">
-                  {command}
-                </span>
-              ))}
-            </span>
-            <span className="level-status-badge">
-              <Map size={13} />
-              Disponible
+            <span className="level-start-action">
+              <Play size={13} />
+              Iniciar
             </span>
           </button>
         ))}
 
-        {/* Arena libre / modo infinito: ocupa ancho completo del grid */}
-        <div className="arena-card" role="region" aria-label="Arena libre">
+        <div className="arena-card" role="region" aria-labelledby="challenge-title">
           <div className="arena-header">
-            <div className="arena-eyebrow">ARENA LIBRE // MODO INFINITO</div>
-            <div className="arena-meta">[∞ MAPAS]</div>
+            <h2 className="arena-eyebrow" id="challenge-title">Desafío</h2>
           </div>
           <div className="arena-body">
             <p className="arena-description">
-              Desafío Procedural
-              <br />
-              Algoritmos dinámicos en mundos generados al azar para probar tu lógica sin límites.
+              Enfréntate a mapas dinámicos y pon a prueba tu lógica resolviendo retos de programación con dificultad variable.
             </p>
             <div className="arena-actions">
-              <button type="button" className="arena-button">
-                <Dice1 size={14} /> Generador Aleatorio
-              </button>
-              <button type="button" className="arena-button">Sandbox</button>
-              <button type="button" className="arena-button primary">
-                <Play size={14} /> JUGAR
+              <button type="button" className="arena-button primary" onClick={() => onSelectLevel(createKarelChallenge())}>
+                <Play size={14} /> Iniciar
               </button>
             </div>
           </div>

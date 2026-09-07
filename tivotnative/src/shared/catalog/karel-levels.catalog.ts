@@ -75,9 +75,9 @@ finalizar-programa`,
     id: 4,
     title: "Nivel 4: Mochilas y Fichas",
     subtitle: "Recolección perimetral de fichas",
-    objective: "Da la vuelta completa por el contorno del mapa y recoge todas las fichas (zumbadores) que encuentres en el camino con 'coge-zumbador'.",
+    objective: "Da la vuelta completa por el contorno del mapa y recoge todas las fichas que encuentres en el camino con 'coge-ficha'.",
     gridPosition: 'bottom-right',
-    commands: ['coge-zumbador;', 'junto-a-zumbador'],
+    commands: ['coge-ficha;', 'junto-a-ficha'],
     initialWorld: {
       karelPosition: { street: 1, avenue: 1 },
       karelDirection: 'ESTE',
@@ -93,8 +93,8 @@ finalizar-programa`,
   inicia-ejecucion
     repetir 4 veces inicio
       repetir 7 veces inicio
-        si junto-a-zumbador entonces inicio
-          coge-zumbador;
+        si junto-a-ficha entonces inicio
+          coge-ficha;
         fin;
         avanza;
       fin;
@@ -103,7 +103,7 @@ finalizar-programa`,
     apagate;
   termina-ejecucion
 finalizar-programa`,
-    initialMessage: "¡Nivel 4: Mochilas y Fichas! En este nivel, mientras recorres el contorno encontrarás fichas (zumbadores) en el camino. Antes de avanzar en cada esquina, verifica con `si junto-a-zumbador` para recoger la ficha con `coge-zumbador;` y guardarla en tu mochila.",
+    initialMessage: "¡Nivel 4: Mochilas y Fichas! En este nivel, mientras recorres el contorno encontrarás fichas en el camino. Antes de avanzar en cada esquina, verifica con `si junto-a-ficha` para recoger la ficha con `coge-ficha;` y guardarla en tu mochila.",
   },
 ]
 
