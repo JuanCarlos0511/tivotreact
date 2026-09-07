@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Tivot Native",
+    "slug": "tivotnative",
+    "version": "1.0.0",
+    "orientation": "default",
+    "supportsTablet": true,
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "requireFullScreen": false
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-image"
+    ]
+  }
+}
