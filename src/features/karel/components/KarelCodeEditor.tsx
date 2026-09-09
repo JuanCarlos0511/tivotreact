@@ -51,6 +51,7 @@ interface KarelCodeEditorProps {
   executionError: string | null;
   isRunning: boolean;
   isPaused: boolean;
+  isApplyingCode?: boolean;
   speedMultiplier: KarelSpeedMultiplier;
   isMobile: boolean;
   onHelp: () => void;
@@ -87,6 +88,7 @@ export function KarelCodeEditor({
   executionError,
   isRunning,
   isPaused,
+  isApplyingCode = false,
   speedMultiplier,
   isMobile,
   onHelp,
@@ -365,8 +367,9 @@ export function KarelCodeEditor({
 
   return (
     <section
-      className={`karel-editor-panel structured-editor ${isExecutionMode ? 'execution-active' : ''} ${tutorialFocus ? `karel-editor-panel-tutorial karel-editor-panel-tutorial-${tutorialFocus}` : ''}`}
+      className={`karel-editor-panel structured-editor ${isExecutionMode ? 'execution-active' : ''} ${isApplyingCode ? 'is-applying-code' : ''} ${tutorialFocus ? `karel-editor-panel-tutorial karel-editor-panel-tutorial-${tutorialFocus}` : ''}`}
       aria-label="Editor de código Karel"
+      aria-busy={isApplyingCode}
     >
       <div className="karel-editor-toolbar">
         <span className="karel-editor-title">
@@ -449,6 +452,17 @@ export function KarelCodeEditor({
         </section>
 
         <section className="line-program" aria-labelledby="line-program-title">
+          {isApplyingCode && (
+            <div className="code-application-overlay" role="status" aria-live="polite">
+              <div className="code-application-scanner" aria-hidden="true" />
+              <div className="code-application-copy">
+                <span>Cargando la sugerencia…</span>
+                <i />
+                <i />
+                <i />
+              </div>
+            </div>
+          )}
           <header className="editor-column-heading">
             <Code2 size={16} />
             <h2 id="line-program-title">Programa</h2>

@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import { ScrollView, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native'
 import { codeFont, colors } from './ui'
 
@@ -39,41 +38,10 @@ const splitMarkdownSegments = (text: string): MarkdownSegment[] => {
   return segments.length > 0 ? segments : [{ kind: 'text', content: text }]
 }
 
-const renderInlineMarkdown = (text: string): ReactNode[] =>
+const stripInlineFormatting = (text: string): string =>
   text
-    .split(/(`[^`]+`|\*\*[^*]+\*\*)/g)
-    .filter(Boolean)
-    .map((chunk, index) => {
-      if (chunk.startsWith('`') && chunk.endsWith('`')) {
-        return <Text style={styles.inlineCode} key={`${chunk}-${index}`}>{chunk.slice(1, -1)}</Text>
-      }
-
-      if (chunk.startsWith('**') && chunk.endsWith('**')) {
-        return <Text style={styles.bold} key={`${chunk}-${index}`}>{chunk.slice(2, -2)}</Text>
-      }
-
-      return <Text key={`${chunk}-${index}`}>{renderKeywordText(chunk)}</Text>
-    })
-
-const renderKeywordText = (text: string): ReactNode[] => {
-  const keywordPattern =
-    /\b(avanza|gira-izquierda|coge-ficha|deja-ficha|coge-zumbador|deja-zumbador|repetir|veces|inicio|fin|si|entonces|mientras|hacer|define-nueva-instruccion|frente-libre|junto-a-ficha|junto-a-zumbador|orientado-al-norte|calle|calles|avenida|avenidas|ficha|fichas|norte|sur|este|oeste|if|while)\b/gi
-  const exactKeywordPattern =
-    /^(avanza|gira-izquierda|coge-ficha|deja-ficha|coge-zumbador|deja-zumbador|repetir|veces|inicio|fin|si|entonces|mientras|hacer|define-nueva-instruccion|frente-libre|junto-a-ficha|junto-a-zumbador|orientado-al-norte|calle|calles|avenida|avenidas|ficha|fichas|norte|sur|este|oeste|if|while)$/i
-
-  return text
-    .split(keywordPattern)
-    .filter((chunk) => chunk.length > 0)
-    .map((chunk, index) =>
-      exactKeywordPattern.test(chunk) ? (
-        <Text key={`${chunk}-${index}`} style={styles.keyword}>
-          {chunk}
-        </Text>
-      ) : (
-        <Text key={`${chunk}-${index}`}>{chunk}</Text>
-      ),
-    )
-}
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
 
 export function MarkdownText({ text, style }: MarkdownMessageProps) {
   return (
@@ -92,7 +60,7 @@ export function MarkdownText({ text, style }: MarkdownMessageProps) {
           .filter((paragraph) => paragraph.trim().length > 0)
           .map((paragraph, paragraphIndex) => (
             <Text selectable style={[styles.paragraph, style]} key={`paragraph-${segmentIndex}-${paragraphIndex}`}>
-              {renderInlineMarkdown(paragraph.trim())}
+              {stripInlineFormatting(paragraph.trim())}
             </Text>
           ))
       })}
@@ -103,9 +71,6 @@ export function MarkdownText({ text, style }: MarkdownMessageProps) {
 const styles = StyleSheet.create({
   content: { gap: 8, minWidth: 0 },
   paragraph: { color: colors.text, fontSize: 14, lineHeight: 21 },
-  bold: { fontWeight: '800' },
-  inlineCode: { fontFamily: codeFont, color: colors.accentStrong, backgroundColor: colors.successBg },
-  keyword: { color: colors.accentStrong, fontWeight: '700' },
   codeBlock: { backgroundColor: colors.panelSoft, borderRadius: 7, borderWidth: 1, borderColor: colors.line },
   codeText: { padding: 10, color: colors.text, fontFamily: codeFont, fontSize: 12, lineHeight: 19 },
 })

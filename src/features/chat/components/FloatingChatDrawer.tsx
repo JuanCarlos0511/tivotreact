@@ -1,5 +1,5 @@
 import { type KeyboardEvent, useEffect, useRef } from 'react'
-import { Loader2, MessageCircle, Send, X } from 'lucide-react'
+import { Loader2, MessageCircle, RotateCcw, Send, X } from 'lucide-react'
 import type { TivotChatSession } from '@shared/types'
 import { ChatMessageItem } from './ChatMessageItem'
 
@@ -20,6 +20,8 @@ interface FloatingChatDrawerProps {
   onSubmitMessage: () => Promise<void>
   onSelectQuickReply: (optionText: string) => Promise<void>
   onSubmitFlowOrder: (messageId: string, problemId: string, submittedOrder: string[]) => Promise<void>
+  onApplySuggestedCode: (suggestedCode: string[]) => void
+  onResetConversation: () => void
 }
 
 export function FloatingChatDrawer({
@@ -39,6 +41,8 @@ export function FloatingChatDrawer({
   onSubmitMessage,
   onSelectQuickReply,
   onSubmitFlowOrder,
+  onApplySuggestedCode,
+  onResetConversation,
 }: FloatingChatDrawerProps) {
   const messageEndRef = useRef<HTMLDivElement | null>(null)
   const latestAssistantMessageId = [...(session?.messages ?? [])].reverse().find((message) => message.role === 'assistant')?.id
@@ -108,11 +112,22 @@ export function FloatingChatDrawer({
             <header className="floating-chat-header">
               <div>
                 <span>Tutor IA</span>
-                <strong>Karel el Robot</strong>
+                <strong>Tivot</strong>
               </div>
-              <button type="button" aria-label="Minimizar chat" onClick={onClose}>
-                <X size={17} />
-              </button>
+              <div className="floating-chat-header-actions">
+                <button
+                  type="button"
+                  aria-label="Reiniciar conversación de este nivel"
+                  title="Reiniciar conversación de este nivel"
+                  disabled={isResponding}
+                  onClick={onResetConversation}
+                >
+                  <RotateCcw size={15} />
+                </button>
+                <button type="button" aria-label="Minimizar chat" onClick={onClose}>
+                  <X size={17} />
+                </button>
+              </div>
             </header>
             <div className="floating-chat-messages" aria-live="polite">
               {session?.messages.map((message) => (
@@ -123,6 +138,7 @@ export function FloatingChatDrawer({
                   onSelectQuickReply={(optionText) => void onSelectQuickReply(optionText)}
                   isLatestAssistantMessage={message.id === latestAssistantMessageId}
                   isLoading={isResponding}
+                  onApplySuggestedCode={onApplySuggestedCode}
                 />
               ))}
               {isResponding && (
@@ -130,7 +146,7 @@ export function FloatingChatDrawer({
                   <div className="assistant-message-layout">
                     <div className="assistant-avatar assistant-avatar-loading" aria-hidden="true" />
                     <div className="message-bubble assistant-message message-loading">
-                      <span>Karel esta revisando tu pregunta</span>
+                      <span>Tivot está revisando tu pregunta</span>
                       <span className="typing-dots" aria-hidden="true">
                         <span />
                         <span />

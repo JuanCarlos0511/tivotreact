@@ -1,6 +1,7 @@
 import type {
   AiChatMessage,
   KarelLevel,
+  TivotAiContext,
   TivotAssistantPayload,
   TivotChatMessage,
   TivotConversationContext,
@@ -16,6 +17,13 @@ import { createStandardTextPayload, isInteractiveFlowProblem } from '@shared/typ
 import { env } from '@config/env'
 import { createAiProvider } from './ai'
 import { parseAssistantPayload } from './parser.service'
+import {
+  createSafeKarelCodeExample,
+  explicitlyRequestsCode,
+  needsTutorResponseCorrection,
+  requestsContourCodeExample,
+  TUTOR_CODE_CORRECTION_REQUEST,
+} from './tutor-response-policy'
 
 const MAX_CONTEXT_TURNS = 3
 const MAX_CONTEXT_MESSAGES = 6
@@ -26,6 +34,7 @@ interface ProcessUserActionInput {
   conversationHistory?: TivotChatMessage[]
   catalog?: TivotProblem[]
   activeLevel?: KarelLevel | null
+  aiContext?: TivotAiContext | null
 }
 
 interface InferenceResult {
@@ -55,8 +64,9 @@ export const processTivotUserAction = async ({
   conversationHistory,
   catalog = [],
   activeLevel = null,
+  aiContext = null,
 }: ProcessUserActionInput): Promise<TivotResponse> => {
-  const result = await resolvePayload(userPayload, context, catalog, conversationHistory, activeLevel)
+  const result = await resolvePayload(userPayload, context, catalog, conversationHistory, activeLevel, aiContext)
 
   return {
     ...result,
@@ -70,12 +80,13 @@ const resolvePayload = async (
   catalog: TivotProblem[],
   conversationHistory?: TivotChatMessage[],
   activeLevel: KarelLevel | null = null,
+  aiContext: TivotAiContext | null = null,
 ): Promise<Omit<TivotResponse, 'context'>> => {
   if (userPayload.user_action === 'submit_flow_order') {
     return resolveFlowSubmission(userPayload.problem_id, userPayload.submitted_order, catalog)
   }
 
-  const inferenceResult = await answerConversation(userPayload.message, context, conversationHistory, activeLevel)
+  const inferenceResult = await answerConversation(userPayload.message, context, conversationHistory, activeLevel, aiContext)
 
   return {
     ...inferenceResult,
@@ -133,11 +144,15 @@ const answerConversation = async (
   context: TivotConversationContext,
   conversationHistory?: TivotChatMessage[],
   activeLevel: KarelLevel | null = null,
+  aiContext: TivotAiContext | null = null,
 ): Promise<InferenceResult> => {
+  const codeWasRequested = explicitlyRequestsCode(query)
   return completeWithFallback(
-    buildConversationPrompt(query, activeLevel),
+    buildConversationPrompt(query, activeLevel, aiContext),
     createAiUnavailablePayload(),
-    buildCleanChatMessages(query, context, conversationHistory, activeLevel),
+    buildCleanChatMessages(query, context, conversationHistory, activeLevel, aiContext),
+    codeWasRequested,
+    createRequestedCodePayload(query, activeLevel),
   )
 }
 
@@ -153,7 +168,7 @@ const answerFlowFailure = async (
       '',
       'Genera una pista socratica de maximo 80 palabras para un orden incorrecto.',
       'No reveles el orden correcto completo.',
-      'Devuelve solo el JSON del formato estricto con tipo="texto" y cuadros=null.',
+      'Devuelve solo JSON válido con mensaje, sugiereCodigo=false y codigoSugerido=null.',
       '',
       `PROBLEMA: ${problem.problem_id} - ${problem.title}`,
       `REGLA_INFRINGIDA: ${violatedRule}`,
@@ -166,31 +181,97 @@ const completeWithFallback = async (
   prompt: string,
   fallbackPayload: TivotAssistantPayload,
   messages?: AiChatMessage[],
+  codeWasRequested = false,
+  requestedCodeFallback: TivotAssistantPayload | null = null,
 ): Promise<InferenceResult> => {
   try {
     console.warn('[Tivot Inference] Proveedor activo:', env.VITE_AI_PROVIDER)
-    const rawAnswer = await createAiProvider().complete(prompt, messages)
+    const provider = createAiProvider()
+    const rawAnswer = await provider.complete(prompt, messages)
+    const payload = parseAssistantPayload(rawAnswer)
+
+    if (needsTutorResponseCorrection(payload, codeWasRequested)) {
+      try {
+        const correctionMessages = messages
+          ? [
+              ...messages,
+              { role: 'assistant' as const, content: rawAnswer },
+              { role: 'user' as const, content: TUTOR_CODE_CORRECTION_REQUEST },
+            ]
+          : undefined
+        const correctedRawAnswer = await provider.complete(
+          `${prompt}\n\n${TUTOR_CODE_CORRECTION_REQUEST}`,
+          correctionMessages,
+        )
+        const correctedPayload = parseAssistantPayload(correctedRawAnswer)
+
+        if (!needsTutorResponseCorrection(correctedPayload, codeWasRequested)) {
+          return {
+            payload: correctedPayload,
+            rawAnswer: correctedRawAnswer,
+            llmInvoked: true,
+          }
+        }
+      } catch (correctionError) {
+        console.error('[Tivot Inference] No se pudo corregir la respuesta sin código:', correctionError)
+      }
+
+      return {
+        payload: requestedCodeFallback ?? createMissingCodePayload(),
+        rawAnswer,
+        llmInvoked: true,
+      }
+    }
 
     return {
-      payload: parseAssistantPayload(rawAnswer),
+      payload,
       rawAnswer,
       llmInvoked: true,
     }
   } catch (error) {
     console.error('[Tivot Inference] Error del proveedor IA:', error)
     return {
-      payload: fallbackPayload,
+      payload: codeWasRequested && requestedCodeFallback ? requestedCodeFallback : fallbackPayload,
       rawAnswer: null,
       llmInvoked: false,
     }
   }
 }
 
+const createRequestedCodePayload = (
+  query: string,
+  activeLevel: KarelLevel | null,
+): TivotAssistantPayload => {
+  const suggestedCode = createSafeKarelCodeExample(query, activeLevel?.quickCommands)
+  const message = requestsContourCodeExample(query) && suggestedCode.length > 3
+    ? 'Preparé un ejemplo para recorrer el contorno. Pruébalo y observa qué zonas quedan sin visitar; todavía tendrás que decidir cómo llegar a las fichas del interior.'
+    : 'Preparé un ejemplo corto y válido. Pulsa Probar código y después Ejecutar para observar qué hace Tivot.'
+
+  return createStandardTextPayload(
+    message,
+    { is_evaluation: false, passed: null, concept: 'Tutor Karel' },
+    null,
+    null,
+    suggestedCode,
+  )
+}
+
+const createMissingCodePayload = (): TivotAssistantPayload =>
+  createStandardTextPayload(
+    'Entendí que quieres probar un ejemplo, pero no pude preparar líneas válidas esta vez. Pídemelo de nuevo y lo intentamos.',
+    {
+      is_evaluation: false,
+      passed: null,
+      concept: 'Tutor Karel',
+    },
+  )
+
 const buildCleanChatMessages = (
   query: string,
   context: TivotConversationContext,
   conversationHistory?: TivotChatMessage[],
   activeLevel: KarelLevel | null = null,
+  aiContext: TivotAiContext | null = null,
 ): AiChatMessage[] => {
   const historyMessages = conversationHistory?.flatMap(cleanChatMessage) ?? []
   const contextMessages = context.turns.flatMap(cleanTurnMessages)
@@ -200,7 +281,7 @@ const buildCleanChatMessages = (
   )
 
   return [
-    { role: 'system', content: `${KAREL_SYSTEM_PROMPT}\n\n${buildKarelLevelContext(activeLevel)}` },
+    { role: 'system', content: `${KAREL_SYSTEM_PROMPT}\n\n${buildKarelLevelContext(activeLevel, aiContext)}` },
     ...cleanHistory.slice(-MAX_CONTEXT_MESSAGES),
     { role: 'user', content: query },
   ]
@@ -220,7 +301,10 @@ const cleanChatMessage = (message: TivotChatMessage): AiChatMessage[] => {
     return [{ role: 'user', content: cleanText(message.content) }]
   }
 
-  return [{ role: 'assistant', content: cleanText(message.payload.message) }]
+  const suggestedCode = message.payload.suggestedCode?.length
+    ? ` Código sugerido anteriormente: ${message.payload.suggestedCode.join(' ')}`
+    : ''
+  return [{ role: 'assistant', content: cleanText(`${message.payload.message}${suggestedCode}`) }]
 }
 
 const cleanTurnMessages = (turn: TivotConversationContext['turns'][number]): AiChatMessage[] => [
@@ -250,7 +334,7 @@ const extractMessageFromJson = (text: string): string => {
 
 const createAiUnavailablePayload = (): TivotAssistantPayload =>
   createStandardTextPayload(
-    'No pude conectar con Qwen. Revisa VITE_QWEN_API_KEY, VITE_QWEN_BASE_URL y reinicia el servidor de desarrollo para cargar el .env.',
+    'Ahora mismo no pude consultar al tutor. Tu código y tu avance siguen guardados; inténtalo de nuevo en un momento.',
     {
       is_evaluation: false,
       passed: null,

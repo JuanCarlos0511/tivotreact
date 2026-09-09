@@ -43,6 +43,7 @@ function App() {
           onSubmitMessage={chat.submitMessage}
           onSelectQuickReply={chat.submitQuickReply}
           onSubmitFlowOrder={chat.submitFlowOrder}
+          onResetConversation={chat.resetLevelChat}
           onBackToLevels={handleBackToLevels}
         />
       )}

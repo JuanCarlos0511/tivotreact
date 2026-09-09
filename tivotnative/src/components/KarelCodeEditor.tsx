@@ -1,9 +1,9 @@
 import {
-  ArrowDown, ArrowUp, BookOpen, Code2, Lightbulb, Pause, Pencil, Play, Plus,
+  ArrowDown, ArrowUp, BookOpen, ChevronLeft, ChevronRight, Code2, Lightbulb, Pause, Pencil, Play, Plus,
   Redo2, RotateCcw, StepBack, StepForward, Terminal, Trash2, Undo2,
 } from 'lucide-react-native'
 import { useEffect, useRef, useState } from 'react'
-import { Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Animated, Easing, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import type { KarelLevel } from '../shared/types'
 import type { CompileResult, ExecutionLoop, KarelSpeedMultiplier } from '../features/karel/hooks/use-karel-runner'
 import {
@@ -17,6 +17,7 @@ import { CommandDialog } from './CommandDialog'
 import { ActionButton, IconButton, codeFont, colors, type TabletMetrics } from './ui'
 
 interface KarelCodeEditorProps {
+  levelId: number
   quickCommands: KarelLevel['quickCommands']
   conditions: KarelLevel['conditions']
   metrics: TabletMetrics
@@ -27,6 +28,7 @@ interface KarelCodeEditorProps {
   executionError: string | null
   isRunning: boolean
   isPaused: boolean
+  isApplyingCode?: boolean
   speedMultiplier: KarelSpeedMultiplier
   onChange: (code: string) => void
   onUndo: () => void
@@ -56,6 +58,7 @@ export function KarelCodeEditor(props: KarelCodeEditorProps) {
   const [pendingCommand, setPendingCommand] = useState<CommandTemplate | null>(null)
   const [editorWidth, setEditorWidth] = useState(0)
   const programRef = useRef<ScrollView>(null)
+  const commandListRef = useRef<ScrollView>(null)
   const rowLayouts = useRef(new Map<number, { y: number; height: number }>())
   const viewport = useRef({ height: 0, offset: 0 })
   const lines = code.split('\n')
@@ -69,6 +72,14 @@ export function KarelCodeEditor(props: KarelCodeEditorProps) {
   const errorLine = executionError ? activeLineNumber : compileResult?.error?.line
   const showHelpColumn = !portrait && editorWidth >= 680
   const showQuickCommandsTutorial = props.tutorialFocus === 'quickCommands'
+  const showQuickCommandArrows = portrait && props.levelId === 4
+  const scanProgress = useRef(new Animated.Value(0)).current
+  const tutorialGlow = useRef(new Animated.Value(0.58)).current
+  const [commandViewportWidth, setCommandViewportWidth] = useState(0)
+  const [commandContentWidth, setCommandContentWidth] = useState(0)
+  const [commandOffset, setCommandOffset] = useState(0)
+  const canScrollCommandsBack = commandOffset > 1
+  const canScrollCommandsForward = commandOffset + commandViewportWidth < commandContentWidth - 1
 
   const revealLine = (index: number) => {
     const row = rowLayouts.current.get(index)
@@ -86,6 +97,40 @@ export function KarelCodeEditor(props: KarelCodeEditorProps) {
     if (selectedLine !== null && selectedLine >= lines.length) setSelectedLine(null)
     if (editingLine !== null && (editingLine >= lines.length || isRunning)) setEditingLine(null)
   }, [lines.length, selectedLine, editingLine, isRunning])
+  useEffect(() => {
+    if (!props.isApplyingCode) {
+      scanProgress.setValue(0)
+      return
+    }
+    const animation = Animated.loop(Animated.timing(scanProgress, {
+      toValue: 1,
+      duration: 720,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: true,
+    }))
+    animation.start()
+    return () => animation.stop()
+  }, [props.isApplyingCode, scanProgress])
+  useEffect(() => {
+    if (!showQuickCommandsTutorial) {
+      tutorialGlow.setValue(0.58)
+      return
+    }
+    const animation = Animated.loop(Animated.sequence([
+      Animated.timing(tutorialGlow, { toValue: 1, duration: 525, useNativeDriver: true }),
+      Animated.timing(tutorialGlow, { toValue: 0.58, duration: 525, useNativeDriver: true }),
+    ]))
+    animation.start()
+    return () => animation.stop()
+  }, [showQuickCommandsTutorial, tutorialGlow])
+
+  const scrollQuickCommands = (direction: -1 | 1) => {
+    const nextOffset = Math.max(
+      0,
+      Math.min(commandContentWidth - commandViewportWidth, commandOffset + direction * Math.max(140, commandViewportWidth * 0.65)),
+    )
+    commandListRef.current?.scrollTo({ x: nextOffset, animated: true })
+  }
 
   const select = (index: number) => {
     setSelectedLine(index)
@@ -188,6 +233,8 @@ export function KarelCodeEditor(props: KarelCodeEditorProps) {
   )
   return (
     <View testID="code-editor" onLayout={event => setEditorWidth(event.nativeEvent.layout.width)}
+      pointerEvents={props.isApplyingCode ? 'none' : 'auto'}
+      accessibilityState={{ busy: Boolean(props.isApplyingCode) }}
       style={[styles.panel, portrait && styles.panelPortrait]}>
       {!portrait && (
         <View style={styles.toolbar}>
@@ -199,12 +246,33 @@ export function KarelCodeEditor(props: KarelCodeEditorProps) {
       )}
       {portrait && controls}
       <View style={[styles.columns, portrait && styles.columnsPortrait]}>
-        <View testID="quick-commands" style={[styles.library, portrait && styles.libraryPortrait, showQuickCommandsTutorial && styles.libraryTutorial]}>
-          <View style={styles.heading}><Plus size={16} color={colors.accentStrong} /><Text style={styles.headingText}>Comandos rápidos</Text></View>
+        <View testID="quick-commands" style={[styles.library, portrait && styles.libraryPortrait]}>
+          <View style={[styles.heading, styles.quickHeading]}>
+            <Plus size={16} color={colors.accentStrong} /><Text style={styles.headingText}>Comandos rápidos</Text>
+            {showQuickCommandArrows && (
+              <View accessibilityLabel="Navegar comandos rápidos" style={styles.carouselActions}>
+                <Animated.View style={[styles.carouselGlow, showQuickCommandsTutorial && { opacity: tutorialGlow }]}>
+                  <IconButton label="Ver comandos anteriores" disabled={!canScrollCommandsBack}
+                    onPress={() => scrollQuickCommands(-1)} style={styles.carouselButton}>
+                    <ChevronLeft size={16} color={colors.accentStrong} />
+                  </IconButton>
+                </Animated.View>
+                <Animated.View style={[styles.carouselGlow, showQuickCommandsTutorial && { opacity: tutorialGlow }]}>
+                  <IconButton label="Ver más comandos" disabled={!canScrollCommandsForward}
+                    onPress={() => scrollQuickCommands(1)} style={styles.carouselButton}>
+                    <ChevronRight size={16} color={colors.accentStrong} />
+                  </IconButton>
+                </Animated.View>
+              </View>
+            )}
+          </View>
           {!portrait && <Text style={styles.caption}>Pulsa para añadir al programa.</Text>}
-          <ScrollView key={portrait ? 'horizontal-commands' : 'vertical-commands'} horizontal={portrait}
+          <ScrollView ref={commandListRef} key={portrait ? 'horizontal-commands' : 'vertical-commands'} horizontal={portrait}
             style={styles.commandList} contentContainerStyle={portrait ? styles.commandStrip : styles.commandGroups}
-            keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false}>
+            keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} scrollEventThrottle={16}
+            onLayout={event => setCommandViewportWidth(event.nativeEvent.layout.width)}
+            onContentSizeChange={width => setCommandContentWidth(width)}
+            onScroll={event => setCommandOffset(event.nativeEvent.contentOffset.x)}>
             {portrait ? commands.map(commandCard) : GROUPS.filter(group => commands.some(command => command.group === group)).map(group => (
               <View key={group} style={styles.category}>
                 <Text style={styles.categoryTitle}>{group.toUpperCase()}</Text>
@@ -214,6 +282,22 @@ export function KarelCodeEditor(props: KarelCodeEditorProps) {
           </ScrollView>
         </View>
         <View style={[styles.program, portrait && styles.programPortrait]}>
+          {props.isApplyingCode && (
+            <View testID="code-application-overlay" accessibilityLiveRegion="polite" style={styles.applicationOverlay}>
+              <Animated.View
+                style={[
+                  styles.scanner,
+                  { transform: [{ translateY: scanProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 230] }) }] },
+                ]}
+              />
+              <View style={styles.applicationCard}>
+                <Text style={styles.applicationTitle}>Cargando la sugerencia…</Text>
+                <View style={styles.skeletonLine} />
+                <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
+                <View style={[styles.skeletonLine, styles.skeletonLineMedium]} />
+              </View>
+            </View>
+          )}
           <View style={styles.heading}>
             <Code2 size={16} color={colors.accentStrong} /><Text style={styles.headingText}>Programa</Text>
             <Text style={styles.count}>{lines.length} líneas</Text>
@@ -344,7 +428,10 @@ const styles = StyleSheet.create({
   columnsPortrait: { borderWidth: 0, borderRadius: 0, flexDirection: 'column', backgroundColor: 'transparent' },
   library: { width: 158, padding: 10, borderRightWidth: 1, borderColor: colors.line, gap: 8 },
   libraryPortrait: { width: '100%', height: 98, padding: 8, paddingBottom: 6, borderRightWidth: 0 },
-  libraryTutorial: { borderWidth: 2, borderColor: colors.accentStrong, backgroundColor: colors.successBg },
+  quickHeading: { flexShrink: 0 },
+  carouselActions: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 5 },
+  carouselGlow: { borderRadius: 7, shadowColor: '#10b981', shadowOpacity: 0.95, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 7 },
+  carouselButton: { width: 30, height: 30, borderColor: '#34d399', backgroundColor: colors.panelRaised },
   caption: { color: colors.muted, fontSize: 11, lineHeight: 16 },
   commandList: { flex: 1, minHeight: 0 },
   commandStrip: { gap: 8, paddingBottom: 4, paddingHorizontal: 2 },
@@ -356,7 +443,7 @@ const styles = StyleSheet.create({
   commandCopy: { flex: 1, minWidth: 0, gap: 4 },
   commandTitle: { fontSize: 11, fontWeight: '800', color: colors.text },
   commandSyntax: { fontFamily: codeFont, fontSize: 9, lineHeight: 13, color: colors.muted },
-  program: { flex: 1, minWidth: 0, minHeight: 0, padding: 10, gap: 6 },
+  program: { position: 'relative', flex: 1, minWidth: 0, minHeight: 0, padding: 10, gap: 6, overflow: 'hidden' },
   programPortrait: { marginHorizontal: 8, marginBottom: 8, padding: 12, borderWidth: 1, borderColor: colors.mobileLine, borderRadius: 8, backgroundColor: colors.panelRaised },
   count: { marginLeft: 'auto', fontSize: 10, color: colors.muted },
   history: { flexDirection: 'row', gap: 6, marginTop: 2 },
@@ -384,6 +471,13 @@ const styles = StyleSheet.create({
   fixedText: { color: colors.muted },
   lineInput: { flex: 1, minWidth: 0, minHeight: 36, paddingVertical: 6, fontSize: 12, lineHeight: 18, fontFamily: codeFont, color: colors.text, textAlignVertical: 'top' },
   addLine: { minHeight: 38, borderStyle: 'dashed', marginTop: 2, paddingVertical: 6 },
+  applicationOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,252,247,0.92)' },
+  scanner: { position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: '#34d399', shadowColor: '#10b981', shadowOpacity: 0.85, shadowRadius: 10, elevation: 8 },
+  applicationCard: { width: '72%', maxWidth: 270, padding: 16, gap: 9, borderWidth: 1, borderColor: '#34d399', borderRadius: 10, backgroundColor: colors.panelRaised, shadowColor: '#000000', shadowOpacity: 0.18, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
+  applicationTitle: { color: colors.accentStrong, fontSize: 12, fontWeight: '900' },
+  skeletonLine: { width: '92%', height: 7, borderRadius: 4, backgroundColor: '#82d8b6' },
+  skeletonLineShort: { width: '72%', opacity: 0.72 },
+  skeletonLineMedium: { width: '84%', opacity: 0.82 },
   help: { width: 158, flexGrow: 0, flexShrink: 0, borderLeftWidth: 1, borderColor: colors.line },
   helpContent: { padding: 12, gap: 10 },
   helpKicker: { marginTop: 16, fontSize: 10, fontWeight: '800', color: colors.accentStrong },

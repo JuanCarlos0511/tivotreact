@@ -31,6 +31,8 @@ interface TivotAssistantPayloadBase {
   type: TivotAssistantPayloadType
   problem_id: string | null
   message: string
+  suggestsCode: boolean
+  suggestedCode: string[] | null
   options: string[] | null
   flow_data: TivotFlowData | null
   metadata: TivotPayloadMetadata
@@ -68,10 +70,13 @@ export const createStandardTextPayload = (
   metadata: TivotPayloadMetadata,
   problemId: string | null = null,
   options: string[] | null = null,
+  suggestedCode: string[] | null = null,
 ): TivotStandardTextPayload => ({
   type: 'standard_text',
   problem_id: problemId,
   message,
+  suggestsCode: Boolean(suggestedCode?.length),
+  suggestedCode: suggestedCode?.length ? suggestedCode : null,
   options,
   flow_data: null,
   metadata,
@@ -205,6 +210,36 @@ export interface KarelWorldState {
   karelDirection: KarelDirection
   beepers: ReadonlyArray<KarelWorldPoint & { count: number }>
   bagBeepers: number
+}
+
+export type TivotExecutionState = 'not_run' | 'running' | 'paused' | 'completed' | 'error'
+
+export interface TivotExecutionSnapshot {
+  state: TivotExecutionState
+  message: string
+  line: number | null
+  attempts: number
+}
+
+export interface TivotAiContext {
+  level: {
+    id: number
+    title: string
+    objective: string
+  }
+  robot: {
+    street: number
+    avenue: number
+    direction: 'arriba' | 'abajo' | 'derecha' | 'izquierda'
+  }
+  board: {
+    rows: number
+    columns: number
+    beepers: ReadonlyArray<KarelWorldPoint & { count: number }>
+  }
+  bagBeepers: number
+  codeLines: string[]
+  lastExecution: TivotExecutionSnapshot
 }
 
 export type KarelCommandId = 'avanza' | 'gira-izquierda' | 'coge-ficha' | 'deja-ficha'

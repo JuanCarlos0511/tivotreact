@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Backpack, Lightbulb } from 'lucide-react'
-import type { KarelLevel, TivotChatSession } from '@shared/types'
+import type { KarelLevel, TivotAiContext, TivotChatSession, TivotExecutionSnapshot } from '@shared/types'
 import { KarelCodeEditor } from '@features/karel/components/KarelCodeEditor'
 import { KarelGrid8x8 } from '@features/karel/components/KarelGrid8x8'
-import { useKarelRunner } from '@features/karel/hooks/use-karel-runner'
+import { buildExecution, useKarelRunner } from '@features/karel/hooks/use-karel-runner'
 import { useIsMobile } from '@features/karel/hooks/use-is-mobile'
+import { createProgramFromSuggestion } from '@features/karel/editor/suggested-code'
 import { GameHelpDialog } from '@features/karel/components/GameHelpDialog'
 import { getInitialTutorialStepForLevel, getTutorialStepsForLevel, hasSeenLevelHelp, markLevelHelpSeen, TUTORIAL_COPY } from '@features/karel/editor/tutorial'
 import type { TutorialStep } from '@features/karel/editor/tutorial'
+import { useTivotAiContext } from '../hooks/use-tivot-ai-context'
 import { FloatingChatDrawer } from './FloatingChatDrawer'
 
 interface ChatWorkspaceProps {
@@ -16,9 +18,10 @@ interface ChatWorkspaceProps {
   query: string
   isResponding: boolean
   onQueryChange: (query: string) => void
-  onSubmitMessage: () => Promise<void>
-  onSelectQuickReply: (optionText: string) => Promise<void>
+  onSubmitMessage: (aiContext: TivotAiContext) => Promise<void>
+  onSelectQuickReply: (optionText: string, aiContext: TivotAiContext) => Promise<void>
   onSubmitFlowOrder: (messageId: string, problemId: string, submittedOrder: string[]) => Promise<void>
+  onResetConversation: () => void
   onBackToLevels: () => void
 }
 
@@ -31,6 +34,7 @@ export function ChatWorkspace({
   onSubmitMessage,
   onSelectQuickReply,
   onSubmitFlowOrder,
+  onResetConversation,
   onBackToLevels,
 }: ChatWorkspaceProps) {
   const [code, setCode] = useState(activeLevel.starterCode)
@@ -39,6 +43,17 @@ export function ChatWorkspace({
     future: [],
   })
   const [isChatOpen, setIsChatOpen] = useState(false)
+  const [isApplyingCode, setIsApplyingCode] = useState(false)
+  const [executionAttempts, setExecutionAttempts] = useState(0)
+  const [lastExecution, setLastExecution] = useState<TivotExecutionSnapshot>({
+    state: 'not_run',
+    message: 'Todavía no se ha probado el código en este nivel.',
+    line: null,
+    attempts: 0,
+  })
+  const [codeFeedback, setCodeFeedback] = useState<{ kind: 'success' | 'error'; message: string } | null>(null)
+  const applyCodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initialTutorialStep = !hasSeenLevelHelp(activeLevel.id)
     ? getInitialTutorialStepForLevel(activeLevel.id)
     : null
@@ -48,6 +63,12 @@ export function ChatWorkspace({
   )
   const isMobile = useIsMobile()
   const runner = useKarelRunner(activeLevel.initialWorld)
+  const aiContext = useTivotAiContext({
+    level: activeLevel,
+    world: runner.worldState,
+    code,
+    lastExecution,
+  })
   const isChatTutorialStep = tutorialStep === 'chat'
   const tutorialSteps = getTutorialStepsForLevel(activeLevel.id)
   const editorTutorialFocus = tutorialStep === 'quickCommands' ? tutorialStep : null
@@ -64,6 +85,17 @@ export function ChatWorkspace({
     setCode(activeLevel.starterCode)
     setCodeHistory({ past: [], future: [] })
     setIsChatOpen(false)
+    setIsApplyingCode(false)
+    setExecutionAttempts(0)
+    setLastExecution({
+      state: 'not_run',
+      message: 'Todavía no se ha probado el código en este nivel.',
+      line: null,
+      attempts: 0,
+    })
+    setCodeFeedback(null)
+    if (applyCodeTimerRef.current) clearTimeout(applyCodeTimerRef.current)
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
     const nextTutorialStep = !hasSeenLevelHelp(activeLevel.id)
       ? getInitialTutorialStepForLevel(activeLevel.id)
       : null
@@ -71,6 +103,80 @@ export function ChatWorkspace({
     setTutorialStep(nextTutorialStep)
     runner.resetExecution()
   }, [activeLevel])
+
+  useEffect(
+    () => () => {
+      if (applyCodeTimerRef.current) clearTimeout(applyCodeTimerRef.current)
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (executionAttempts === 0) return
+
+    if (runner.executionError) {
+      setLastExecution({
+        state: 'error',
+        message: runner.executionError,
+        line: runner.activeLineNumber,
+        attempts: executionAttempts,
+      })
+      return
+    }
+
+    if (runner.compileResult?.error) {
+      setLastExecution({
+        state: 'error',
+        message: `El código necesita un ajuste en la línea ${runner.compileResult.error.line}: ${runner.compileResult.error.message}`,
+        line: runner.compileResult.error.line,
+        attempts: executionAttempts,
+      })
+      return
+    }
+
+    if (runner.isRunning) {
+      setLastExecution({
+        state: 'running',
+        message: 'El robot está probando el código ahora mismo.',
+        line: runner.activeLineNumber,
+        attempts: executionAttempts,
+      })
+      return
+    }
+
+    if (runner.isPaused) {
+      setLastExecution({
+        state: 'paused',
+        message: 'La prueba está en pausa.',
+        line: runner.activeLineNumber,
+        attempts: executionAttempts,
+      })
+      return
+    }
+
+    if (
+      runner.compileResult?.success &&
+      runner.steps.length > 0 &&
+      runner.currentStepIndex === runner.steps.length - 1
+    ) {
+      setLastExecution({
+        state: 'completed',
+        message: 'El robot terminó todas las instrucciones sin chocar.',
+        line: null,
+        attempts: executionAttempts,
+      })
+    }
+  }, [
+    executionAttempts,
+    runner.activeLineNumber,
+    runner.compileResult,
+    runner.currentStepIndex,
+    runner.executionError,
+    runner.isPaused,
+    runner.isRunning,
+    runner.steps.length,
+  ])
 
   const advanceTutorial = () => {
     if (!tutorialStep) return
@@ -135,6 +241,47 @@ export function ChatWorkspace({
     runner.resetExecution()
   }
 
+  const showCodeFeedback = (kind: 'success' | 'error', message: string) => {
+    setCodeFeedback({ kind, message })
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
+    feedbackTimerRef.current = setTimeout(() => setCodeFeedback(null), 2600)
+  }
+
+  const applySuggestedCode = (suggestedCode: string[]) => {
+    if (isApplyingCode || runner.isRunning) return
+
+    setIsChatOpen(false)
+    setIsApplyingCode(true)
+    if (applyCodeTimerRef.current) clearTimeout(applyCodeTimerRef.current)
+    applyCodeTimerRef.current = setTimeout(() => {
+      const nextCode = createProgramFromSuggestion(suggestedCode)
+      const validation = nextCode ? buildExecution(nextCode, activeLevel.initialWorld).result : null
+
+      if (!nextCode || !validation?.success) {
+        setIsApplyingCode(false)
+        showCodeFeedback('error', 'La sugerencia no tenía un formato válido. Pídele al tutor otro ejemplo.')
+        return
+      }
+
+      handleCodeChange(nextCode)
+      setIsApplyingCode(false)
+      showCodeFeedback('success', '¡Código cargado en tu editor! Dale a ejecutar para probarlo.')
+    }, 750)
+  }
+
+  const runCurrentCode = () => {
+    if (isApplyingCode) return
+    const nextAttempts = executionAttempts + 1
+    setExecutionAttempts(nextAttempts)
+    setLastExecution({
+      state: 'running',
+      message: 'El robot está probando el código ahora mismo.',
+      line: null,
+      attempts: nextAttempts,
+    })
+    runner.runCode(code)
+  }
+
   return (
     <section className={`karel-workspace ${tutorialStep ? 'karel-workspace-tutorial' : ''}`}>
       <header className="karel-game-header">
@@ -176,6 +323,7 @@ export function ChatWorkspace({
         executionError={runner.executionError}
         isRunning={runner.isRunning}
         isPaused={runner.isPaused}
+        isApplyingCode={isApplyingCode}
         speedMultiplier={runner.speedMultiplier}
         isMobile={isMobile}
         onHelp={openHelp}
@@ -184,7 +332,7 @@ export function ChatWorkspace({
         onRedo={redoCodeChange}
         canUndo={codeHistory.past.length > 0}
         canRedo={codeHistory.future.length > 0}
-        onRun={() => runner.runCode(code)}
+        onRun={runCurrentCode}
         onReset={resetCodeAndWorld}
         onPauseToggle={runner.togglePause}
         onStepBack={runner.stepBack}
@@ -210,10 +358,18 @@ export function ChatWorkspace({
         onClose={() => setIsChatOpen(false)}
         onDismissObjective={dismissTutorial}
         onQueryChange={onQueryChange}
-        onSubmitMessage={onSubmitMessage}
-        onSelectQuickReply={onSelectQuickReply}
+        onSubmitMessage={() => onSubmitMessage(aiContext)}
+        onSelectQuickReply={(optionText) => onSelectQuickReply(optionText, aiContext)}
         onSubmitFlowOrder={onSubmitFlowOrder}
+        onApplySuggestedCode={applySuggestedCode}
+        onResetConversation={onResetConversation}
       />
+
+      {codeFeedback && (
+        <div className={`code-feedback-toast code-feedback-toast-${codeFeedback.kind}`} role="status">
+          {codeFeedback.message}
+        </div>
+      )}
 
       <GameHelpDialog
         isOpen={showObjective || (tutorialStep !== null && editorTutorialFocus === null)}

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import type {
   FlowSubmissionState,
   KarelLevel,
   TivotAssistantChatMessage,
   TivotAssistantPayload,
+  TivotAiContext,
   TivotChatSession,
 } from '../../../shared/types'
 import { createEmptyTivotConversationContext, createStandardTextPayload } from '../../../shared/types'
@@ -36,11 +38,12 @@ const createSessionTitle = (prompt: string): string => {
 }
 
 const createLevelSessionId = (levelId: number) => `karel-level-${levelId}`
+const createLevelStorageKey = (levelId: number) => `tivot_chat_level_${levelId}`
 
 const createInitialLevelMessage = (level: KarelLevel): TivotAssistantChatMessage =>
   createAssistantMessage(
     createStandardTextPayload(
-      `Objetivo del mapa: ${level.objective}${level.mode === 'challenge' || !level.initialMessage ? '' : `\n\n${level.initialMessage}`}`,
+      `¡Hola! Te acompañaré paso a paso en este reto. ${level.objective}${level.mode === 'challenge' || !level.initialMessage ? '' : `\n\n${level.initialMessage}`}`,
       {
         is_evaluation: false,
         passed: null,
@@ -56,58 +59,99 @@ const createLevelSession = (level: KarelLevel): TivotChatSession => ({
   messages: [createInitialLevelMessage(level)],
 })
 
+const loadLevelSession = async (level: KarelLevel): Promise<TivotChatSession | null> => {
+  try {
+    const stored = await AsyncStorage.getItem(createLevelStorageKey(level.id))
+    if (!stored) return null
+    const parsed: unknown = JSON.parse(stored)
+    if (!parsed || typeof parsed !== 'object') return null
+
+    const session = parsed as TivotChatSession
+    if (!Array.isArray(session.messages) || !session.context || !Array.isArray(session.context.turns)) return null
+    return {
+      ...session,
+      id: createLevelSessionId(level.id),
+      title: level.title,
+      messages: session.messages.map(message => message.role === 'assistant'
+        ? {
+            ...message,
+            payload: {
+              ...message.payload,
+              suggestsCode: Boolean(message.payload.suggestedCode?.length),
+              suggestedCode: message.payload.suggestedCode?.length ? message.payload.suggestedCode : null,
+            },
+          }
+        : message),
+    }
+  } catch {
+    return null
+  }
+}
+
+const persistLevelSession = async (levelId: number, session: TivotChatSession) => {
+  try {
+    await AsyncStorage.setItem(createLevelStorageKey(levelId), JSON.stringify(session))
+  } catch {
+    // The current in-memory conversation remains usable if device storage is unavailable.
+  }
+}
+
 export const useTivotChat = (activeLevel: KarelLevel | null) => {
   const [sessions, setSessions] = useState<TivotChatSession[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string>('')
   const [query, setQuery] = useState('')
   const [isResponding, setIsResponding] = useState(false)
 
+  const expectedSessionId = activeLevel ? createLevelSessionId(activeLevel.id) : activeSessionId
   const activeSession = useMemo(
-    () => sessions.find((session) => session.id === activeSessionId) ?? sessions[0] ?? null,
-    [activeSessionId, sessions],
+    () => sessions.find(session => session.id === expectedSessionId) ?? null,
+    [expectedSessionId, sessions],
   )
 
   useEffect(() => {
     if (!activeLevel) return
 
     const sessionId = createLevelSessionId(activeLevel.id)
-    setSessions((currentSessions) => {
-      if (currentSessions.some((session) => session.id === sessionId)) return currentSessions
-      return [createLevelSession(activeLevel), ...currentSessions]
-    })
     setActiveSessionId(sessionId)
     setQuery('')
+    let cancelled = false
+    void loadLevelSession(activeLevel).then(storedSession => {
+      if (cancelled) return
+      setSessions(latestSessions => latestSessions.some(session => session.id === sessionId)
+        ? latestSessions
+        : [storedSession ?? createLevelSession(activeLevel), ...latestSessions])
+    })
+    return () => { cancelled = true }
   }, [activeLevel])
 
-  const startNewChat = () => {
+  useEffect(() => {
     if (!activeLevel) return
+    const session = sessions.find(candidate => candidate.id === createLevelSessionId(activeLevel.id))
+    if (session) void persistLevelSession(activeLevel.id, session)
+  }, [activeLevel, sessions])
 
-    const id = createMessageId('chat')
-    const newSession: TivotChatSession = {
-      id,
-      title: activeLevel.title,
-      context: createEmptyTivotConversationContext(),
-      messages: [createInitialLevelMessage(activeLevel)],
-    }
+  const resetLevelChat = () => {
+    if (!activeLevel || isResponding) return
 
-    setSessions((currentSessions) => [newSession, ...currentSessions])
-    setActiveSessionId(id)
+    const session = createLevelSession(activeLevel)
+    setSessions(currentSessions => [session, ...currentSessions.filter(candidate => candidate.id !== session.id)])
+    setActiveSessionId(session.id)
     setQuery('')
   }
 
-  const submitMessage = async () => {
+  const submitMessage = async (aiContext: TivotAiContext) => {
     const trimmedQuery = query.trim()
     if (!trimmedQuery || !activeSession || !activeLevel || isResponding) return
 
-    await submitPrompt(trimmedQuery)
+    await submitPrompt(trimmedQuery, aiContext)
   }
 
-  const submitQuickReply = async (optionText: string) => {
+  const submitQuickReply = async (optionText: string, aiContext: TivotAiContext) => {
     if (!activeSession || !activeLevel || isResponding) return
-    await submitPrompt(optionText)
+    await submitPrompt(optionText, aiContext)
   }
 
-  const submitPrompt = async (prompt: string) => {
+  const submitPrompt = async (prompt: string, aiContext: TivotAiContext) => {
     if (!activeSession || !activeLevel || isResponding) return
 
     const sessionSnapshot = activeSession
@@ -127,6 +171,7 @@ export const useTivotChat = (activeLevel: KarelLevel | null) => {
       context: sessionSnapshot.context,
       conversationHistory: updatedMessages,
       activeLevel,
+      aiContext,
     })
 
     setSessions((currentSessions) =>
@@ -216,8 +261,9 @@ export const useTivotChat = (activeLevel: KarelLevel | null) => {
     submitMessage,
     submitPrompt,
     submitQuickReply,
-    createChat: startNewChat,
-    startNewChat,
+    createChat: resetLevelChat,
+    startNewChat: resetLevelChat,
+    resetLevelChat,
     submitFlowOrder,
   }
 }

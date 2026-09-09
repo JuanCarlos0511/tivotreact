@@ -87,6 +87,7 @@ finalizar-programa`;
     assert.equal(collision.lineNumber, 3);
     assert.equal(collision.worldSnapshot.karelPosition.avenue, 8);
     assert.equal(collision.loops[0].iteration, 8);
+    assert.match(run('  coge-ficha;').steps.at(-1).error, /No hay fichas/);
     assert.match(run('  deja-ficha;').steps.at(-1).error, /mochila/);
   });
   test(`${root}: invalid syntax, removed commands and unmatched delimiters are rejected`, () => {

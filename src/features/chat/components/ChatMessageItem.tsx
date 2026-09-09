@@ -1,3 +1,4 @@
+import { Zap } from 'lucide-react'
 import type { TivotAssistantChatMessage, TivotChatMessage } from '@shared/types'
 import tivotIcon from '@/assets/tivot_icon.png'
 import { MarkdownMessage } from './MarkdownMessage'
@@ -7,6 +8,7 @@ interface ChatMessageItemProps {
   message: TivotChatMessage
   onSubmitFlowOrder: (messageId: string, problemId: string, submittedOrder: string[]) => Promise<void>
   onSelectQuickReply?: (optionText: string) => void
+  onApplySuggestedCode?: (suggestedCode: string[]) => void
   isLatestAssistantMessage?: boolean
   isLoading?: boolean
 }
@@ -15,6 +17,7 @@ const renderAssistantContent = (
   message: TivotAssistantChatMessage,
   onSubmitFlowOrder: ChatMessageItemProps['onSubmitFlowOrder'],
   onSelectQuickReply: ChatMessageItemProps['onSelectQuickReply'],
+  onApplySuggestedCode: ChatMessageItemProps['onApplySuggestedCode'],
   isLatestAssistantMessage: boolean,
   isLoading: boolean,
 ) => (
@@ -23,6 +26,21 @@ const renderAssistantContent = (
       <img className="assistant-avatar" src={tivotIcon} alt="" aria-hidden="true" />
       <div className="message-bubble assistant-message">
         <MarkdownMessage text={message.payload.message} />
+        {message.payload.suggestsCode && message.payload.suggestedCode && (
+          <div className="suggested-code-card">
+            <pre aria-label="Código sugerido">
+              <code>{message.payload.suggestedCode.join('\n')}</code>
+            </pre>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => onApplySuggestedCode?.(message.payload.suggestedCode ?? [])}
+            >
+              <Zap size={15} aria-hidden="true" />
+              Probar código
+            </button>
+          </div>
+        )}
         {message.payload.options && (
           <div className="quick-reply-list" aria-label="Respuestas rapidas">
             {message.payload.options.map((option) => {
@@ -63,6 +81,7 @@ export function ChatMessageItem({
   message,
   onSubmitFlowOrder,
   onSelectQuickReply,
+  onApplySuggestedCode,
   isLatestAssistantMessage = false,
   isLoading = false,
 }: ChatMessageItemProps) {
@@ -78,7 +97,7 @@ export function ChatMessageItem({
 
   return (
     <article className="message-row message-row-assistant">
-      {renderAssistantContent(message, onSubmitFlowOrder, onSelectQuickReply, isLatestAssistantMessage, isLoading)}
+      {renderAssistantContent(message, onSubmitFlowOrder, onSelectQuickReply, onApplySuggestedCode, isLatestAssistantMessage, isLoading)}
     </article>
   )
 }

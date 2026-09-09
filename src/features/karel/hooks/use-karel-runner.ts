@@ -138,7 +138,7 @@ const applyCommand = (command: BasicCommand, world: KarelWorldState): { world: K
         beeper.avenue === nextWorld.karelPosition.avenue &&
         beeper.count > 0,
     )
-    if (beeperIndex < 0) return { world: nextWorld }
+    if (beeperIndex < 0) return { world, error: 'No hay fichas en esta casilla' }
 
     const nextBeepers = [...nextWorld.beepers]
     const currentBeeper = nextBeepers[beeperIndex]

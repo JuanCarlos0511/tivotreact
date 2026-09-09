@@ -2,8 +2,7 @@ import { Image } from 'expo-image'
 import { Play } from 'lucide-react-native'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { ActionButton, colors, type TabletMetrics } from './ui'
-
-const tivotIcon = require('../../assets/tivot_icon.png')
+import tivotIcon from '../../assets/tivot_icon.png'
 
 export function StartScreen({ onStart }: { metrics: TabletMetrics; onStart: () => void }) {
   return (

@@ -24,11 +24,19 @@ const optionsSchema = z
   .nullable()
   .transform((options) => cleanOptions(options))
 
+const suggestedCodeSchema = z
+  .array(z.string())
+  .optional()
+  .nullable()
+  .transform(lines => cleanSuggestedCode(lines))
+
 const assistantPayloadSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('standard_text'),
     problem_id: z.string().nullable(),
     message: z.string().min(1),
+    suggestsCode: z.boolean().optional(),
+    suggestedCode: suggestedCodeSchema,
     options: optionsSchema,
     flow_data: z.null(),
     metadata: metadataSchema,
@@ -37,6 +45,8 @@ const assistantPayloadSchema = z.discriminatedUnion('type', [
     type: z.literal('interactive_flow'),
     problem_id: z.string().min(1),
     message: z.string().min(1),
+    suggestsCode: z.boolean().optional(),
+    suggestedCode: suggestedCodeSchema,
     options: optionsSchema,
     flow_data: flowDataSchema,
     metadata: metadataSchema,
@@ -50,6 +60,12 @@ const spanishAssistantPayloadSchema = z.object({
   opciones: optionsSchema,
 })
 
+const tutorAssistantPayloadSchema = z.object({
+  mensaje: z.string().min(1),
+  sugiereCodigo: z.boolean(),
+  codigoSugerido: suggestedCodeSchema,
+})
+
 export const parseAssistantPayload = (rawContent: string): TivotAssistantPayload => {
   const jsonSource = extractJsonObject(rawContent)
   if (!jsonSource) return createFallbackPayload(rawContent)
@@ -57,7 +73,10 @@ export const parseAssistantPayload = (rawContent: string): TivotAssistantPayload
   try {
     const parsed: unknown = JSON.parse(jsonSource)
     const result = assistantPayloadSchema.safeParse(parsed)
-    if (result.success) return result.data
+    if (result.success) return normalizeAssistantPayload(result.data)
+
+    const tutorResult = tutorAssistantPayloadSchema.safeParse(parsed)
+    if (tutorResult.success) return normalizeTutorPayload(tutorResult.data)
 
     const spanishResult = spanishAssistantPayloadSchema.safeParse(parsed)
     if (spanishResult.success) return normalizeSpanishPayload(spanishResult.data)
@@ -66,6 +85,32 @@ export const parseAssistantPayload = (rawContent: string): TivotAssistantPayload
   } catch {
     return createFallbackPayload(rawContent)
   }
+}
+
+const normalizeAssistantPayload = (
+  payload: z.infer<typeof assistantPayloadSchema>,
+): TivotAssistantPayload => {
+  const suggestedCode = payload.suggestsCode === false ? null : payload.suggestedCode
+
+  return {
+    ...payload,
+    suggestsCode: Boolean(suggestedCode?.length),
+    suggestedCode: suggestedCode?.length ? suggestedCode : null,
+  }
+}
+
+const normalizeTutorPayload = (
+  payload: z.infer<typeof tutorAssistantPayloadSchema>,
+): TivotAssistantPayload => {
+  const suggestedCode = payload.sugiereCodigo ? payload.codigoSugerido : null
+
+  return createStandardTextPayload(
+    payload.mensaje,
+    { is_evaluation: false, passed: null, concept: 'Tutor Karel' },
+    null,
+    null,
+    suggestedCode,
+  )
 }
 
 const normalizeSpanishPayload = (payload: z.infer<typeof spanishAssistantPayloadSchema>): TivotAssistantPayload => {
@@ -111,6 +156,18 @@ const cleanOptions = (options: string[] | null | undefined): string[] | null => 
     .slice(0, 4)
 
   return cleanedOptions.length > 0 ? cleanedOptions : null
+}
+
+const cleanSuggestedCode = (lines: string[] | null | undefined): string[] | null => {
+  if (!Array.isArray(lines)) return null
+
+  const cleanedLines = lines
+    .flatMap(line => line.replace(/```(?:pascal|text)?/gi, '').split(/\r?\n/))
+    .map(line => line.trimEnd())
+    .filter(line => line.trim().length > 0)
+    .slice(0, 80)
+
+  return cleanedLines.length > 0 ? cleanedLines : null
 }
 
 const extractJsonObject = (rawContent: string): string | null => {

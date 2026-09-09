@@ -12,11 +12,12 @@ import { LevelSelectScreen } from './src/components/LevelSelectScreen'
 import { ResponsiveDialog } from './src/components/ResponsiveDialog'
 import { StartScreen } from './src/components/StartScreen'
 import { IconButton, createTabletMetrics, colors, type TabletMetrics } from './src/components/ui'
-import { useTivotChat } from './src/features/chat/hooks'
+import { useTivotAiContext, useTivotChat } from './src/features/chat/hooks'
 import { codeHistoryReducer, createCodeHistory, type CodeHistoryAction } from './src/features/karel/editor/code-history'
+import { createProgramFromSuggestion } from './src/features/karel/editor/suggested-code'
 import { getInitialTutorialStepForLevel, getTutorialStepsForLevel, hasSeenLevelHelp, markLevelHelpSeen, type TutorialStep } from './src/features/karel/editor/tutorial'
-import { useKarelRunner } from './src/features/karel/hooks/use-karel-runner'
-import type { KarelLevel } from './src/shared/types'
+import { buildExecution, useKarelRunner } from './src/features/karel/hooks/use-karel-runner'
+import type { KarelLevel, TivotExecutionSnapshot } from './src/shared/types'
 
 type AppScreen = 'START' | 'LEVEL_SELECT' | 'WORKSPACE'
 
@@ -62,6 +63,14 @@ function WorkspaceScreen({ metrics, activeLevel, chat, onBackToLevels }: {
 }) {
   const [history, dispatch] = useReducer(codeHistoryReducer, activeLevel.starterCode, createCodeHistory)
   const [isChatOpen, setChatOpen] = useState(false)
+  const [isApplyingCode, setIsApplyingCode] = useState(false)
+  const [executionAttempts, setExecutionAttempts] = useState(0)
+  const [lastExecution, setLastExecution] = useState<TivotExecutionSnapshot>({
+    state: 'not_run', message: 'Todavía no se ha probado el código en este nivel.', line: null, attempts: 0,
+  })
+  const [codeFeedback, setCodeFeedback] = useState<{ kind: 'success' | 'error'; message: string } | null>(null)
+  const applyCodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initialTutorialStep = !hasSeenLevelHelp(activeLevel.id)
     ? getInitialTutorialStepForLevel(activeLevel.id)
     : null
@@ -71,6 +80,12 @@ function WorkspaceScreen({ metrics, activeLevel, chat, onBackToLevels }: {
   )
   const [availableHeight, setAvailableHeight] = useState(metrics.height)
   const runner = useKarelRunner(activeLevel.initialWorld)
+  const aiContext = useTivotAiContext({
+    level: activeLevel,
+    world: runner.worldState,
+    code: history.code,
+    lastExecution,
+  })
   const tutorialSteps = getTutorialStepsForLevel(activeLevel.id)
   const editorTutorialFocus = tutorialStep === 'quickCommands' ? tutorialStep : null
   const pauseRef = useRef(runner.pauseExecution)
@@ -81,6 +96,40 @@ function WorkspaceScreen({ metrics, activeLevel, chat, onBackToLevels }: {
     })
     return () => subscription.remove()
   }, [])
+  useEffect(() => () => {
+    if (applyCodeTimerRef.current) clearTimeout(applyCodeTimerRef.current)
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
+  }, [])
+  useEffect(() => {
+    if (executionAttempts === 0) return
+    if (runner.executionError) {
+      setLastExecution({ state: 'error', message: runner.executionError, line: runner.activeLineNumber, attempts: executionAttempts })
+      return
+    }
+    if (runner.compileResult?.error) {
+      setLastExecution({
+        state: 'error',
+        message: `El código necesita un ajuste en la línea ${runner.compileResult.error.line}: ${runner.compileResult.error.message}`,
+        line: runner.compileResult.error.line,
+        attempts: executionAttempts,
+      })
+      return
+    }
+    if (runner.isRunning) {
+      setLastExecution({ state: 'running', message: 'El robot está probando el código ahora mismo.', line: runner.activeLineNumber, attempts: executionAttempts })
+      return
+    }
+    if (runner.isPaused) {
+      setLastExecution({ state: 'paused', message: 'La prueba está en pausa.', line: runner.activeLineNumber, attempts: executionAttempts })
+      return
+    }
+    if (runner.compileResult?.success && runner.steps.length > 0 && runner.currentStepIndex === runner.steps.length - 1) {
+      setLastExecution({ state: 'completed', message: 'El robot terminó todas las instrucciones sin chocar.', line: null, attempts: executionAttempts })
+    }
+  }, [
+    executionAttempts, runner.activeLineNumber, runner.compileResult, runner.currentStepIndex,
+    runner.executionError, runner.isPaused, runner.isRunning, runner.steps.length,
+  ])
   const closeHelp = () => {
     setHelpOpen(false)
     setTutorialStep(null)
@@ -97,9 +146,40 @@ function WorkspaceScreen({ metrics, activeLevel, chat, onBackToLevels }: {
     setHelpOpen(true)
   }
   const changeCode = (action: CodeHistoryAction) => {
-    if (runner.isRunning) return
+    if (runner.isRunning || isApplyingCode) return
     dispatch(action)
     runner.resetExecution()
+  }
+  const showCodeFeedback = (kind: 'success' | 'error', message: string) => {
+    setCodeFeedback({ kind, message })
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
+    feedbackTimerRef.current = setTimeout(() => setCodeFeedback(null), 2600)
+  }
+  const applySuggestedCode = (suggestedCode: string[]) => {
+    if (isApplyingCode || runner.isRunning) return
+    setChatOpen(false)
+    setIsApplyingCode(true)
+    if (applyCodeTimerRef.current) clearTimeout(applyCodeTimerRef.current)
+    applyCodeTimerRef.current = setTimeout(() => {
+      const nextCode = createProgramFromSuggestion(suggestedCode)
+      const validation = nextCode ? buildExecution(nextCode, activeLevel.initialWorld).result : null
+      if (!nextCode || !validation?.success) {
+        setIsApplyingCode(false)
+        showCodeFeedback('error', 'La sugerencia no tenía un formato válido. Pídele al tutor otro ejemplo.')
+        return
+      }
+      dispatch({ type: 'change', code: nextCode })
+      runner.resetExecution()
+      setIsApplyingCode(false)
+      showCodeFeedback('success', '¡Código cargado en tu editor! Dale a ejecutar para probarlo.')
+    }, 750)
+  }
+  const runCurrentCode = () => {
+    if (isApplyingCode) return
+    const nextAttempts = executionAttempts + 1
+    setExecutionAttempts(nextAttempts)
+    setLastExecution({ state: 'running', message: 'El robot está probando el código ahora mismo.', line: null, attempts: nextAttempts })
+    runner.runCode(history.code)
   }
   const reset = runner.resetExecution
   const portrait = !metrics.isLandscape
@@ -128,13 +208,13 @@ function WorkspaceScreen({ metrics, activeLevel, chat, onBackToLevels }: {
         </View>
         <View style={[styles.body, portrait && styles.bodyPortrait]}>
           <View style={[styles.boardPane, { width: boardWidth }, portrait && styles.boardPortrait]}><KarelBoard world={runner.worldState} isRunning={runner.isRunning} hasError={Boolean(runner.executionError || runner.compileResult?.error)} wallCollision={Boolean(runner.executionError?.includes('muro'))} /></View>
-          <KarelCodeEditor quickCommands={activeLevel.quickCommands} conditions={activeLevel.conditions} metrics={metrics} code={history.code} activeLineNumber={runner.activeLineNumber} activeLoops={runner.activeLoops}
+          <KarelCodeEditor levelId={activeLevel.id} quickCommands={activeLevel.quickCommands} conditions={activeLevel.conditions} metrics={metrics} code={history.code} activeLineNumber={runner.activeLineNumber} activeLoops={runner.activeLoops}
             compileResult={runner.compileResult} executionError={runner.executionError}
-            isRunning={runner.isRunning} isPaused={runner.isPaused} speedMultiplier={runner.speedMultiplier}
+            isRunning={runner.isRunning} isPaused={runner.isPaused} isApplyingCode={isApplyingCode} speedMultiplier={runner.speedMultiplier}
             onChange={code => changeCode({ type: 'change', code })}
             canUndo={history.past.length > 0} canRedo={history.future.length > 0}
             onUndo={() => changeCode({ type: 'undo' })} onRedo={() => changeCode({ type: 'redo' })}
-            onRun={() => runner.runCode(history.code)}
+            onRun={runCurrentCode}
             onReset={reset} onHelp={openHelp} onPauseToggle={runner.togglePause}
             onStepBack={runner.stepBack} onStepForward={() => runner.stepForward(history.code)}
             onSpeedChange={runner.setSpeedMultiplier} tutorialFocus={editorTutorialFocus}
@@ -143,14 +223,25 @@ function WorkspaceScreen({ metrics, activeLevel, chat, onBackToLevels }: {
         <ResponsiveDialog visible={isChatOpen} onClose={() => setChatOpen(false)} label="Chat tutor de Karel"
           placement={portrait ? 'bottom' : 'right'} style={portrait ? styles.chatPortrait : undefined}>
           <ChatPanel session={chat.activeSession} query={chat.query} isResponding={chat.isResponding}
-            onClose={() => setChatOpen(false)} onQueryChange={chat.setQuery} onSubmitMessage={chat.submitMessage}
-            onSelectQuickReply={chat.submitQuickReply} onSubmitFlowOrder={chat.submitFlowOrder} />
+            onClose={() => setChatOpen(false)} onQueryChange={chat.setQuery}
+            onSubmitMessage={() => chat.submitMessage(aiContext)}
+            onSelectQuickReply={option => chat.submitQuickReply(option, aiContext)}
+            onSubmitFlowOrder={chat.submitFlowOrder} onApplySuggestedCode={applySuggestedCode}
+            onResetConversation={chat.resetLevelChat} />
         </ResponsiveDialog>
         <GameHelpDialog visible={helpOpen && editorTutorialFocus === null} portrait={portrait} objective={activeLevel.objective} step={tutorialStep}
           onClose={closeHelp} onNext={nextTutorial} onRestart={() => setTutorialStep(getInitialTutorialStepForLevel(activeLevel.id) ?? 'chat')}
           onPrevious={() => {
             if (tutorialStep) setTutorialStep(tutorialSteps[Math.max(0, tutorialSteps.indexOf(tutorialStep) - 1)] ?? tutorialSteps[0] ?? 'chat')
           }} />
+        {codeFeedback && (
+          <View accessibilityLiveRegion="polite" style={[
+            styles.codeFeedback,
+            codeFeedback.kind === 'error' ? styles.codeFeedbackError : styles.codeFeedbackSuccess,
+          ]}>
+            <Text style={styles.codeFeedbackText}>{codeFeedback.message}</Text>
+          </View>
+        )}
       </View>
     </KeyboardAvoidingView>
   )
@@ -173,4 +264,12 @@ const styles = StyleSheet.create({
   boardPane: { alignSelf: 'flex-start', flexShrink: 0 },
   boardPortrait: { alignSelf: 'center' },
   chatPortrait: { height: '78%' },
+  codeFeedback: {
+    position: 'absolute', left: 16, right: 16, bottom: 18, zIndex: 40, alignSelf: 'center',
+    maxWidth: 440, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderRadius: 9,
+    shadowColor: '#000000', shadowOpacity: 0.25, shadowRadius: 14, shadowOffset: { width: 0, height: 7 }, elevation: 10,
+  },
+  codeFeedbackSuccess: { borderColor: '#34d399', backgroundColor: '#065f46' },
+  codeFeedbackError: { borderColor: '#f87171', backgroundColor: '#7f1d1d' },
+  codeFeedbackText: { color: '#ecfdf5', fontSize: 13, fontWeight: '800', textAlign: 'center' },
 })
