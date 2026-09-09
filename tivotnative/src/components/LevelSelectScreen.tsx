@@ -1,272 +1,58 @@
-import { Image } from 'expo-image'
-import { ArrowLeft, CheckCircle2, Dice1, Map, Play } from 'lucide-react-native'
+import { ArrowLeft, Play } from 'lucide-react-native'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { KAREL_LEVELS } from '../shared/catalog'
+import { createKarelChallenge, KAREL_LEVELS } from '../shared/catalog'
 import type { KarelLevel } from '../shared/types'
-import type { TabletMetrics } from './ui'
-import { colors } from './ui'
+import { ActionButton, IconButton, colors, type TabletMetrics } from './ui'
+import { LinearGradient } from 'expo-linear-gradient'
 
-const levelImages: Record<number, number> = {
-  1: require('../../assets/lvl1icon.png'),
-  2: require('../../assets/lvl2icon.png'),
-  3: require('../../assets/lvl3icon.png'),
-  4: require('../../assets/lvl4icon.png'),
-}
-
-interface LevelSelectScreenProps {
-  metrics: TabletMetrics
-  onBack: () => void
-  onSelectLevel: (level: KarelLevel) => void
-}
-
-export function LevelSelectScreen({ metrics, onBack, onSelectLevel }: LevelSelectScreenProps) {
-  const cardWidth = metrics.isLandscape ? '48.8%' : '100%'
-
+export function LevelSelectScreen({ metrics, onBack, onSelectLevel }: {
+  metrics: TabletMetrics; onBack: () => void; onSelectLevel: (level: KarelLevel) => void
+}) {
+  const cardWidth = (Math.min(metrics.width, 820) - 48) / 2
   return (
-    <View style={styles.screen}>
-      <View style={styles.header}>
-        <Pressable onPress={onBack} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-          <ArrowLeft color={colors.muted} size={20} />
-        </Pressable>
-        <View style={styles.headerCopy}>
-          <Text style={styles.kicker}>Mapas de aprendizaje</Text>
-          <Text style={[styles.title, metrics.isTablet && styles.titleTablet]}>Selecciona un mapa</Text>
+    <ScrollView contentContainerStyle={styles.screen}>
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <IconButton label="Volver" onPress={onBack}><ArrowLeft size={18} color={colors.muted} /></IconButton>
+          <Text accessibilityRole="header" style={styles.title}>Seleccionar nivel</Text>
         </View>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.levelScroller} showsVerticalScrollIndicator={false}>
-        <View style={[styles.levelGrid, !metrics.isLandscape && styles.levelGridPortrait]}>
-          {KAREL_LEVELS.map((level) => (
-            <Pressable
-              key={level.id}
-              onPress={() => onSelectLevel(level)}
-              style={({ pressed }) => [styles.levelCard, { width: cardWidth }, pressed && styles.pressed]}
-            >
-              <Image source={levelImages[level.id]} style={styles.levelImage} contentFit="contain" />
-              <View style={styles.levelCopy}>
-                <View style={styles.levelTopline}>
-                  <Text style={styles.levelNumber}>Nivel {level.id}</Text>
-                  <CheckCircle2 color={colors.accent} size={18} />
-                </View>
-                <Text style={styles.levelTitle}>{level.title.replace(/^Nivel \d+: /, '')}</Text>
-                <Text style={styles.levelDescription}>{level.subtitle}</Text>
-                <View style={styles.statusBadge}>
-                  <Map color={colors.accentDark} size={14} />
-                  <Text style={styles.statusBadgeText}>Disponible</Text>
-                </View>
-              </View>
+        <View style={styles.grid}>
+          {KAREL_LEVELS.map(level => (
+            <Pressable key={level.id} accessibilityRole="button" accessibilityLabel={'Nivel ' + level.id + ': ' + level.title.replace(/^Nivel \d+: /, '')}
+              onPress={() => onSelectLevel(level)} style={({ pressed }) => [styles.card, { width: cardWidth }, pressed && styles.pressed]}>
+              <Text style={styles.number}>Nivel {level.id}</Text>
+              <Text style={styles.cardTitle}>{level.title.replace(/^Nivel \d+: /, '')}</Text>
+              <Text style={styles.description}>{level.subtitle}</Text>
+              <LinearGradient colors={['#7cf5bc', '#10b981']} style={styles.startAction}>
+                <Play size={13} color={colors.accentDark} /><Text style={styles.startText}>Iniciar</Text>
+              </LinearGradient>
             </Pressable>
           ))}
-
-          <View style={[styles.arenaCard, { width: metrics.isLandscape ? '100%' : cardWidth }]}>
-            <View style={styles.arenaHeader}>
-              <Text style={styles.arenaEyebrow}>Arena libre // modo infinito</Text>
-              <Text style={styles.arenaMeta}>Mapas dinamicos</Text>
-            </View>
-            <Text style={styles.arenaTitle}>Desafio procedural</Text>
-            <Text style={styles.arenaDescription}>
-              Algoritmos dinamicos en mundos generados al azar para probar tu logica sin limites.
-            </Text>
-            <View style={styles.arenaActions}>
-              <View style={styles.arenaButton}>
-                <Dice1 color={colors.accentStrong} size={15} />
-                <Text style={styles.arenaButtonText}>Generador</Text>
-              </View>
-              <View style={styles.arenaButton}>
-                <Text style={styles.arenaButtonText}>Sandbox</Text>
-              </View>
-              <View style={[styles.arenaButton, styles.arenaButtonPrimary]}>
-                <Play color={colors.accentDark} size={15} fill={colors.accentDark} />
-                <Text style={styles.arenaButtonPrimaryText}>Jugar</Text>
-              </View>
-            </View>
-          </View>
         </View>
-      </ScrollView>
-    </View>
+        <View style={styles.challenge}>
+          <Text style={styles.challengeTitle}>Desafío</Text>
+          <Text style={styles.description}>Enfréntate a mapas dinámicos y pon a prueba tu lógica resolviendo retos de programación con dificultad variable.</Text>
+          <ActionButton label="Iniciar desafío" variant="primary" icon={<Play size={14} color={colors.accentDark} />}
+            onPress={() => onSelectLevel(createKarelChallenge())} style={styles.challengeAction} />
+        </View>
+      </View>
+    </ScrollView>
   )
 }
-
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    padding: 20,
-    gap: 18,
-  },
-  header: {
-    minHeight: 54,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(18, 23, 21, 0.72)',
-  },
-  headerCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  kicker: {
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  title: {
-    marginTop: 4,
-    color: colors.text,
-    fontSize: 27,
-    fontWeight: '900',
-  },
-  titleTablet: {
-    fontSize: 34,
-  },
-  levelScroller: {
-    paddingBottom: 28,
-  },
-  levelGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  levelGridPortrait: {
-    maxWidth: 720,
-    alignSelf: 'center',
-  },
-  levelCard: {
-    minHeight: 218,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.26)',
-    borderRadius: 8,
-    backgroundColor: 'rgba(7, 18, 15, 0.9)',
-    flexDirection: 'row',
-    gap: 14,
-  },
-  levelImage: {
-    width: 112,
-    height: 112,
-    alignSelf: 'center',
-  },
-  levelCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: 8,
-  },
-  levelTopline: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  levelNumber: {
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  levelTitle: {
-    color: colors.text,
-    fontSize: 21,
-    fontWeight: '900',
-  },
-  levelDescription: {
-    color: colors.muted,
-    fontSize: 14,
-    lineHeight: 19,
-    fontWeight: '700',
-  },
-  statusBadge: {
-    marginTop: 'auto',
-    alignSelf: 'flex-start',
-    minHeight: 30,
-    paddingHorizontal: 10,
-    borderRadius: 7,
-    backgroundColor: colors.accent,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statusBadgeText: {
-    color: colors.accentDark,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  arenaCard: {
-    minHeight: 160,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(251, 191, 36, 0.42)',
-    borderRadius: 8,
-    backgroundColor: 'rgba(20, 17, 8, 0.86)',
-    gap: 10,
-  },
-  arenaHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  arenaEyebrow: {
-    color: colors.warning,
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  arenaMeta: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  arenaTitle: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  arenaDescription: {
-    maxWidth: 760,
-    color: colors.muted,
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '700',
-  },
-  arenaActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  arenaButton: {
-    minHeight: 34,
-    paddingHorizontal: 11,
-    borderRadius: 7,
-    borderWidth: 1,
-    borderColor: 'rgba(251, 191, 36, 0.28)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  arenaButtonPrimary: {
-    borderColor: colors.warning,
-    backgroundColor: colors.warning,
-  },
-  arenaButtonText: {
-    color: '#fde68a',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  arenaButtonPrimaryText: {
-    color: '#120a02',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  pressed: {
-    transform: [{ scale: 0.99 }],
-  },
+  screen: { flexGrow: 1, alignItems: 'center', paddingVertical: 28, paddingHorizontal: 18 },
+  content: { width: '100%', maxWidth: 784, gap: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
+  title: { flex: 1, minWidth: 0, fontSize: 26, fontWeight: '800', color: colors.text },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  card: { minHeight: 198, padding: 14, borderWidth: 1, borderColor: colors.line, borderRadius: 8, backgroundColor: colors.panel, alignItems: 'flex-start' },
+  number: { color: colors.accentStrong, fontSize: 12, fontWeight: '900' },
+  cardTitle: { marginTop: 14, fontSize: 17, lineHeight: 21, fontWeight: '800', color: colors.text },
+  description: { marginTop: 8, fontSize: 12, lineHeight: 17, color: colors.muted },
+  startAction: { alignSelf: 'stretch', minHeight: 36, marginTop: 'auto', borderRadius: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  startText: { fontSize: 11, fontWeight: '800', color: colors.accentDark },
+  challenge: { minHeight: 160, padding: 16, borderWidth: 1, borderColor: colors.line, borderRadius: 8, backgroundColor: colors.panel, gap: 8 },
+  challengeTitle: { color: colors.accentStrong, fontSize: 18, fontWeight: '800' },
+  challengeAction: { alignSelf: 'flex-start' },
+  pressed: { borderColor: colors.accentStrong },
 })

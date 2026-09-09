@@ -2,7 +2,8 @@ import { ArrowDown, ArrowUp, Lock, Send } from 'lucide-react-native'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useFlowChallenge } from '../features/chat/hooks'
 import type { FlowSubmissionState, TivotInteractiveFlowPayload } from '../shared/types'
-import { MarkdownText, colors } from './ui'
+import { colors } from './ui'
+import { MarkdownText } from './MarkdownText'
 
 interface ReorderableFlowProps {
   payload: TivotInteractiveFlowPayload
@@ -31,6 +32,8 @@ export function ReorderableFlow({ payload, submission, onSubmit }: ReorderableFl
             <Text style={styles.nodeLabel}>{node.label}</Text>
             <View style={styles.nodeActions}>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={'Subir paso ' + (index + 1)}
                 disabled={index === 0 || isLocked || isSubmitting}
                 onPress={() => challenge.moveNode(index, index - 1)}
                 style={[styles.nodeMoveButton, (index === 0 || isLocked || isSubmitting) && styles.disabled]}
@@ -38,6 +41,8 @@ export function ReorderableFlow({ payload, submission, onSubmit }: ReorderableFl
                 <ArrowUp color={colors.accentStrong} size={15} />
               </Pressable>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={'Bajar paso ' + (index + 1)}
                 disabled={index === challenge.nodes.length - 1 || isLocked || isSubmitting}
                 onPress={() => challenge.moveNode(index, index + 1)}
                 style={[
@@ -53,6 +58,8 @@ export function ReorderableFlow({ payload, submission, onSubmit }: ReorderableFl
       </View>
 
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Revisar orden"
         disabled={isLocked || isSubmitting}
         onPress={() => onSubmit(challenge.submittedOrder)}
         style={[styles.submitButton, (isLocked || isSubmitting) && styles.disabled]}
@@ -78,9 +85,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: 'rgba(111, 240, 179, 0.34)',
+    borderColor: colors.line,
     borderRadius: 8,
-    backgroundColor: 'rgba(6, 78, 59, 0.14)',
+    backgroundColor: colors.panel,
     gap: 10,
   },
   flowInstruction: {
@@ -96,9 +103,9 @@ const styles = StyleSheet.create({
     minHeight: 48,
     padding: 8,
     borderWidth: 1,
-    borderColor: 'rgba(111, 240, 179, 0.28)',
+    borderColor: colors.line,
     borderRadius: 8,
-    backgroundColor: 'rgba(17, 24, 39, 0.72)',
+    backgroundColor: colors.panelRaised,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
@@ -129,8 +136,8 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   nodeMoveButton: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     borderWidth: 1,
     borderColor: 'rgba(111, 240, 179, 0.28)',
     borderRadius: 7,

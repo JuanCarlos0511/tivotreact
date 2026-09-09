@@ -32,7 +32,7 @@ export const createAiProvider = (): AiProvider => {
     return new GeminiAdapter(config)
   }
 
-  throw new Error(`No hay un proveedor IA real configurado para "${config.provider}". Configura VITE_AI_PROVIDER=qwen y VITE_QWEN_API_KEY.`)
+  throw new Error(`No hay un proveedor IA real configurado para "${config.provider}". Configura EXPO_PUBLIC_AI_PROVIDER y su clave en tivotnative/.env.local.`)
 }
 
 const resolveRuntimeConfig = (): AiProviderRuntimeConfig => {
@@ -40,7 +40,7 @@ const resolveRuntimeConfig = (): AiProviderRuntimeConfig => {
 
   return {
     provider,
-    apiKey: provider === 'qwen' ? env.VITE_QWEN_API_KEY.trim() : '',
+    apiKey: provider === 'qwen' ? env.VITE_QWEN_API_KEY.trim() : env.VITE_AI_API_KEY.trim(),
     baseUrl: provider === 'qwen' ? env.VITE_QWEN_BASE_URL : env.VITE_AI_BASE_URL,
     modelName: provider === 'qwen' ? env.VITE_QWEN_MODEL : env.VITE_AI_MODEL_NAME,
     timeoutMs: env.VITE_AI_TIMEOUT_MS,

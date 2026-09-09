@@ -15,7 +15,7 @@ export class QwenAdapter implements AiProvider {
 
   async complete(prompt: string, messages: ChatContextMessage[] = [{ role: 'user', content: prompt }]): Promise<string> {
     if (!this.config.apiKey) {
-      throw new Error('No se encontró VITE_QWEN_API_KEY en las variables de entorno.')
+      throw new Error('No se encontró EXPO_PUBLIC_QWEN_API_KEY en las variables de entorno.')
     }
 
     const response = await fetchWithTimeout(`${this.config.baseUrl}/chat/completions`, {

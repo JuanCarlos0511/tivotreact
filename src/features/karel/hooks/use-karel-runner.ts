@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import type { KarelDirection, KarelWorldState } from '@shared/types'
 
+export interface ExecutionLoop {
+  lineNumber: number
+  endLineNumber: number
+  iteration: number
+  total?: number
+}
+
 export interface ExecutionStep {
+  loops: ExecutionLoop[]
   lineNumber: number
   command: string
   worldSnapshot: KarelWorldState
@@ -24,17 +32,17 @@ type BasicCommand =
   | 'deja-ficha;'
   | 'coge-zumbador;'
   | 'deja-zumbador;'
-  | 'apagate;'
 type Condition = 'frente-libre' | 'junto-a-ficha' | 'junto-a-zumbador' | 'orientado-al-norte'
 
 type Statement =
   | { type: 'basic'; command: BasicCommand; lineNumber: number }
   | { type: 'call'; name: string; lineNumber: number }
-  | { type: 'repeat'; count: number; body: Statement[]; lineNumber: number }
-  | { type: 'while'; condition: Condition; body: Statement[]; lineNumber: number }
-  | { type: 'if'; condition: Condition; body: Statement[]; lineNumber: number }
+  | { type: 'repeat'; count: number; body: Statement[]; lineNumber: number; endLineNumber: number }
+  | { type: 'while'; condition: Condition; body: Statement[]; lineNumber: number; endLineNumber: number }
+  | { type: 'if'; condition: Condition; body: Statement[]; lineNumber: number; endLineNumber: number }
 
 interface ParsedProgram {
+  startLineNumber: number
   main: Statement[]
   procedures: Map<string, Statement[]>
   endLineNumber: number
@@ -52,7 +60,6 @@ const BASIC_COMMANDS = new Set<BasicCommand>([
   'deja-ficha;',
   'coge-zumbador;',
   'deja-zumbador;',
-  'apagate;',
 ])
 const CONDITIONS = new Set<Condition>([
   'frente-libre',
@@ -62,8 +69,8 @@ const CONDITIONS = new Set<Condition>([
 ])
 const MAX_WHILE_ITERATIONS = 64
 const BASE_STEP_DELAY_MS = 600
-const MISSING_SHUTDOWN_WARNING =
-  "Recordatorio: al terminar de usar a Karel, agrega 'apagate;' para cerrar formalmente el programa."
+const MAX_EXECUTION_STEPS = 4096
+const MAX_BLOCK_DEPTH = 64
 export type KarelSpeedMultiplier = 0.5 | 1 | 1.5 | 2
 
 const cloneWorld = (world: KarelWorldState): KarelWorldState => ({
@@ -114,7 +121,7 @@ const applyCommand = (command: BasicCommand, world: KarelWorldState): { world: K
 
   if (command === 'avanza;') {
     const nextPosition = getNextPosition(nextWorld)
-    if (!isInsideWorld(nextPosition)) return { world, error: 'Error: Karel choco con un muro' }
+    if (!isInsideWorld(nextPosition)) return { world, error: 'Karel chocó con un muro' }
     nextWorld.karelPosition = nextPosition
     return { world: nextWorld }
   }
@@ -148,7 +155,7 @@ const applyCommand = (command: BasicCommand, world: KarelWorldState): { world: K
   }
 
   if (command === 'deja-ficha;' || command === 'deja-zumbador;') {
-    if (nextWorld.bagBeepers <= 0) return { world, error: 'Error: No tienes fichas en la mochila' }
+    if (nextWorld.bagBeepers <= 0) return { world, error: 'No tienes fichas en la mochila' }
 
     const beeperIndex = nextWorld.beepers.findIndex(
       (beeper) =>
@@ -192,69 +199,26 @@ const parseProgram = (code: string): { program?: ParsedProgram; result: CompileR
     }
   }
 
-  const startIndex = lines.findIndex((line) => line.text === 'inicia-ejecucion')
-  const endIndex = lines.findIndex((line) => line.text === 'termina-ejecucion')
-  if (startIndex < 0 || endIndex < 0 || endIndex <= startIndex) {
-    return {
-      result: {
-        success: false,
-        error: { line: firstLine.lineNumber, message: 'Falta el bloque inicia-ejecucion ... termina-ejecucion' },
-      },
-    }
-  }
-
   const procedures = new Map<string, Statement[]>()
-  let procedureCursor = 1
-  while (procedureCursor < startIndex) {
-    const line = lines[procedureCursor]
-    if (!line) break
-    const procedureMatch = line.text.match(/^define-nueva-instruccion\s+([a-zA-Z][\w-]*)\s+como\s+inicio$/)
-    if (!procedureMatch) {
-      return {
-        result: {
-          success: false,
-          error: { line: line.lineNumber, message: 'Solo se permiten definiciones antes de inicia-ejecucion' },
-        },
+  // Collect names first so definitions can call each other; execution is bounded below.
+  for (const line of lines) {
+    const name = line.text.match(/^define-nueva-instruccion\s+([a-zA-Z][\w-]*)\s+como\s+inicio$/)?.[1]
+    if (name) {
+      if (procedures.has(name) || BASIC_COMMANDS.has(`${name};` as BasicCommand) ||
+          ['apagate', 'apagar', 'iniciar-programa', 'finalizar-programa', 'inicia-ejecucion', 'termina-ejecucion',
+            'repetir', 'si', 'mientras', 'define-nueva-instruccion', 'inicio', 'fin'].includes(name)) {
+        return { result: { success: false, error: { line: line.lineNumber, message: 'Nombre de instrucción duplicado o reservado' } } }
       }
+      procedures.set(name, [])
     }
-
-    const procedureName = procedureMatch[1]
-    if (!procedureName) {
-      return { result: { success: false, error: { line: line.lineNumber, message: 'Nombre de instruccion invalido' } } }
-    }
-    const parsed = parseBlock(lines, procedureCursor + 1, procedures)
-    if (!parsed.success) return { result: parsed.result }
-    procedures.set(procedureName, parsed.statements)
-    procedureCursor = parsed.nextIndex
   }
-
-  const parsedMain = parseBlock(lines, startIndex + 1, procedures, endIndex)
+  const parsedMain = parseBlock(lines, 1, procedures, lines.length - 1)
   if (!parsedMain.success) return { result: parsedMain.result }
-  const warning = statementsMayPowerOff(parsedMain.statements, procedures) ? undefined : MISSING_SHUTDOWN_WARNING
-
   return {
-    program: { main: parsedMain.statements, procedures, endLineNumber: lines[endIndex]?.lineNumber ?? lastLine.lineNumber },
-    result: warning ? { success: true, warning } : { success: true },
+    program: { startLineNumber: firstLine.lineNumber, main: parsedMain.statements, procedures, endLineNumber: lastLine.lineNumber },
+    result: { success: true },
   }
 }
-
-const statementsMayPowerOff = (
-  statements: Statement[],
-  procedures: Map<string, Statement[]>,
-  visitedProcedures = new Set<string>(),
-): boolean =>
-  statements.some((statement) => {
-    if (statement.type === 'basic') return statement.command === 'apagate;'
-    if (statement.type === 'repeat' || statement.type === 'while' || statement.type === 'if') {
-      return statementsMayPowerOff(statement.body, procedures, visitedProcedures)
-    }
-    if (visitedProcedures.has(statement.name)) return false
-    const procedureBody = procedures.get(statement.name)
-    if (!procedureBody) return false
-
-    visitedProcedures.add(statement.name)
-    return statementsMayPowerOff(procedureBody, procedures, visitedProcedures)
-  })
 
 type ParseBlockResult =
   | { success: true; statements: Statement[]; nextIndex: number }
@@ -265,7 +229,11 @@ const parseBlock = (
   startIndex: number,
   procedures: Map<string, Statement[]>,
   explicitEndIndex?: number,
+  depth = 0,
 ): ParseBlockResult => {
+  if (depth > MAX_BLOCK_DEPTH) return {
+    success: false, result: { success: false, error: { line: lines[startIndex]?.lineNumber ?? 1, message: 'Demasiados bloques anidados' } },
+  }
   const statements: Statement[] = []
   let cursor = startIndex
 
@@ -276,14 +244,29 @@ const parseBlock = (
 
     const line = lines[cursor]
     if (!line) break
-    if (line.text === 'fin;') return { success: true, statements, nextIndex: cursor + 1 }
-    if (line.text === 'termina-ejecucion') return { success: true, statements, nextIndex: cursor }
+    if (line.text === 'fin;') {
+      if (explicitEndIndex === undefined) return { success: true, statements, nextIndex: cursor + 1 }
+      return { success: false, result: { success: false, error: { line: line.lineNumber, message: 'fin; no tiene un bloque abierto' } } }
+    }
+    if (line.text === 'finalizar-programa') break
+    const definition = line.text.match(/^define-nueva-instruccion\s+([a-zA-Z][\w-]*)\s+como\s+inicio$/)
+    if (definition) {
+      if (depth > 0) return { success: false, result: { success: false, error: { line: line.lineNumber, message: 'Define las instrucciones fuera de otros bloques' } } }
+      const parsed = parseBlock(lines, cursor + 1, procedures, undefined, depth + 1)
+      if (!parsed.success) return parsed
+      procedures.set(definition[1]!, parsed.statements)
+      cursor = parsed.nextIndex
+      continue
+    }
 
     const repeatMatch = line.text.match(/^repetir\s+(\d+)\s+veces\s+inicio$/)
     if (repeatMatch) {
-      const parsed = parseBlock(lines, cursor + 1, procedures)
+      if (!Number.isSafeInteger(Number(repeatMatch[1])) || Number(repeatMatch[1]) < 1) return {
+        success: false, result: { success: false, error: { line: line.lineNumber, message: 'La repetición debe ser un entero mayor que cero' } },
+      }
+      const parsed = parseBlock(lines, cursor + 1, procedures, undefined, depth + 1)
       if (!parsed.success) return parsed
-      statements.push({ type: 'repeat', count: Number(repeatMatch[1]), body: parsed.statements, lineNumber: line.lineNumber })
+      statements.push({ type: 'repeat', count: Number(repeatMatch[1]), body: parsed.statements, lineNumber: line.lineNumber, endLineNumber: lines[parsed.nextIndex - 1]!.lineNumber })
       cursor = parsed.nextIndex
       continue
     }
@@ -292,9 +275,9 @@ const parseBlock = (
     if (whileMatch) {
       const condition = parseCondition(whileMatch[1], line.lineNumber)
       if (!condition.success) return { success: false, result: condition.result }
-      const parsed = parseBlock(lines, cursor + 1, procedures)
+      const parsed = parseBlock(lines, cursor + 1, procedures, undefined, depth + 1)
       if (!parsed.success) return parsed
-      statements.push({ type: 'while', condition: condition.value, body: parsed.statements, lineNumber: line.lineNumber })
+      statements.push({ type: 'while', condition: condition.value, body: parsed.statements, lineNumber: line.lineNumber, endLineNumber: lines[parsed.nextIndex - 1]!.lineNumber })
       cursor = parsed.nextIndex
       continue
     }
@@ -303,9 +286,9 @@ const parseBlock = (
     if (ifMatch) {
       const condition = parseCondition(ifMatch[1], line.lineNumber)
       if (!condition.success) return { success: false, result: condition.result }
-      const parsed = parseBlock(lines, cursor + 1, procedures)
+      const parsed = parseBlock(lines, cursor + 1, procedures, undefined, depth + 1)
       if (!parsed.success) return parsed
-      statements.push({ type: 'if', condition: condition.value, body: parsed.statements, lineNumber: line.lineNumber })
+      statements.push({ type: 'if', condition: condition.value, body: parsed.statements, lineNumber: line.lineNumber, endLineNumber: lines[parsed.nextIndex - 1]!.lineNumber })
       cursor = parsed.nextIndex
       continue
     }
@@ -359,61 +342,69 @@ const parseCondition = (
 const createExecutionSteps = (program: ParsedProgram, initialWorld: KarelWorldState): ExecutionStep[] => {
   const steps: ExecutionStep[] = []
   let world = cloneWorld(initialWorld)
-  let isPoweredOff = false
-
-  const pushStep = (lineNumber: number, command: string, nextWorld: KarelWorldState, error?: string) => {
-    const step = error
-      ? { lineNumber, command, worldSnapshot: cloneWorld(nextWorld), error }
-      : { lineNumber, command, worldSnapshot: cloneWorld(nextWorld) }
-    steps.push(step)
+  let stopped = false
+  const loops: ExecutionLoop[] = []
+  const pushStep = (lineNumber: number, command: string, error?: string) => {
+    if (stopped) return
+    const limitError = steps.length >= MAX_EXECUTION_STEPS - 1 ? 'Se excedió el límite de pasos del programa' : undefined
+    const stepError = error || limitError
+    steps.push({ lineNumber, command, worldSnapshot: cloneWorld(world), loops: loops.map(loop => ({ ...loop })), ...(stepError ? { error: stepError } : {}) })
+    if (error || limitError) stopped = true
   }
-
-  const executeStatements = (statements: Statement[]): void => {
+  const executeStatements = (statements: Statement[], callDepth = 0): void => {
     for (const statement of statements) {
-      if (isPoweredOff || steps.at(-1)?.error) return
-
+      if (stopped) return
       if (statement.type === 'basic') {
         const result = applyCommand(statement.command, world)
-        world = cloneWorld(result.world)
-        pushStep(statement.lineNumber, statement.command, world, result.error)
-        if (statement.command === 'apagate;' || result.error) isPoweredOff = true
-        continue
-      }
-
-      if (statement.type === 'call') {
-        executeStatements(program.procedures.get(statement.name) ?? [])
-        continue
-      }
-
-      if (statement.type === 'repeat') {
-        for (let index = 0; index < statement.count; index += 1) executeStatements(statement.body)
-        continue
-      }
-
-      if (statement.type === 'if') {
-        if (evaluateCondition(statement.condition, world)) executeStatements(statement.body)
-        continue
-      }
-
-      let iterations = 0
-      while (evaluateCondition(statement.condition, world) && !isPoweredOff && !steps.at(-1)?.error) {
-        if (iterations >= MAX_WHILE_ITERATIONS) {
-          pushStep(statement.lineNumber, statement.condition, world, 'Error: El bucle mientras excedio el limite de seguridad')
-          isPoweredOff = true
-          return
+        world = result.world
+        pushStep(statement.lineNumber, statement.command, result.error)
+      } else if (statement.type === 'call') {
+        pushStep(statement.lineNumber, `${statement.name};`, callDepth >= MAX_BLOCK_DEPTH ? 'Demasiadas llamadas anidadas' : undefined)
+        if (!stopped) executeStatements(program.procedures.get(statement.name) ?? [], callDepth + 1)
+      } else if (statement.type === 'if') {
+        const matches = evaluateCondition(statement.condition, world)
+        pushStep(statement.lineNumber, `si ${statement.condition}`)
+        if (matches) {
+          executeStatements(statement.body, callDepth)
+          pushStep(statement.endLineNumber, 'fin;')
         }
-        executeStatements(statement.body)
-        iterations += 1
+      } else {
+        let iteration = 0
+        while (!stopped) {
+          const matches = statement.type === 'repeat' ? iteration < statement.count : evaluateCondition(statement.condition, world)
+          if (!matches) {
+            if (statement.type === 'while') pushStep(statement.lineNumber, `mientras ${statement.condition}`)
+            break
+          }
+          if (statement.type === 'while' && iteration >= MAX_WHILE_ITERATIONS) {
+            pushStep(statement.lineNumber, 'mientras', 'El bucle mientras excedió el límite de seguridad')
+            break
+          }
+          iteration += 1
+          loops.push({ lineNumber: statement.lineNumber, endLineNumber: statement.endLineNumber, iteration,
+            ...(statement.type === 'repeat' ? { total: statement.count } : {}) })
+          pushStep(statement.lineNumber, statement.type === 'repeat' ? 'repetir' : 'mientras')
+          if (!stopped) executeStatements(statement.body, callDepth)
+          pushStep(statement.endLineNumber, 'fin;')
+          loops.pop()
+        }
       }
     }
   }
-
+  pushStep(program.startLineNumber, 'iniciar-programa')
   executeStatements(program.main)
+  pushStep(program.endLineNumber, 'finalizar-programa')
   return steps
 }
 
+// Pure entry point also used by regression tests and both playback modes.
+export const buildExecution = (code: string, initialWorld: KarelWorldState) => {
+  const { result, program } = parseProgram(code)
+  return { result, steps: program ? createExecutionSteps(program, initialWorld) : [] }
+}
+
 export const useKarelRunner = (initialWorld: KarelWorldState) => {
-  const timeoutRef = useRef<number | null>(null)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const stepsRef = useRef<ExecutionStep[]>([])
   const currentStepIndexRef = useRef(-1)
   const speedMultiplierRef = useRef<KarelSpeedMultiplier>(1)
@@ -430,12 +421,11 @@ export const useKarelRunner = (initialWorld: KarelWorldState) => {
   useEffect(() => {
     resetExecution()
     return () => clearPendingTimeout()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialWorld])
 
   const clearPendingTimeout = () => {
     if (timeoutRef.current === null) return
-    window.clearTimeout(timeoutRef.current)
+    clearTimeout(timeoutRef.current)
     timeoutRef.current = null
   }
 
@@ -469,7 +459,14 @@ export const useKarelRunner = (initialWorld: KarelWorldState) => {
   const prepareSteps = (code: string): boolean => {
     const parsed = parseProgram(code)
     setCompileResult(parsed.result)
-    if (!parsed.result.success || !parsed.program) return false
+    if (!parsed.result.success || !parsed.program) {
+      stepsRef.current = []
+      setSteps([])
+      setCurrentStep(-1)
+      setIsRunning(false)
+      setIsPaused(false)
+      return false
+    }
 
     const nextSteps = createExecutionSteps(parsed.program, initialWorld)
     stepsRef.current = nextSteps
@@ -513,7 +510,7 @@ export const useKarelRunner = (initialWorld: KarelWorldState) => {
       return
     }
 
-    timeoutRef.current = window.setTimeout(() => playFrom(stepIndex + 1), getDelayMs())
+    timeoutRef.current = setTimeout(() => playFrom(stepIndex + 1), getDelayMs())
   }
 
   const runCode = (code: string) => {
@@ -571,6 +568,7 @@ export const useKarelRunner = (initialWorld: KarelWorldState) => {
     steps,
     currentStepIndex,
     activeLineNumber,
+    activeLoops: steps[currentStepIndex]?.loops ?? [],
     isRunning,
     isPaused,
     executionError,

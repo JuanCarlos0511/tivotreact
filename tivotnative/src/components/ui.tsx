@@ -1,42 +1,42 @@
+import { LinearGradient } from 'expo-linear-gradient'
 import type { ReactNode } from 'react'
-import { Pressable, StyleSheet, Text, type StyleProp, type TextStyle, View, type ViewStyle } from 'react-native'
+import { Platform, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native'
 
 export const colors = {
-  shell: '#060909',
-  shellAlt: '#09100e',
-  panel: '#07120f',
-  panelRaised: '#101b17',
-  panelSoft: '#111827',
-  line: 'rgba(132, 147, 141, 0.28)',
-  lineStrong: 'rgba(52, 211, 153, 0.72)',
-  text: '#edf6f0',
-  muted: '#c0c9c3',
-  faint: '#748078',
+  shell: '#f1ece3',
+  shellAlt: '#f7f2ea',
+  panel: '#fffcf7',
+  panelRaised: '#ffffff',
+  panelSoft: '#f7f2ea',
+  line: '#d9d8cd',
+  lineStrong: '#08734f',
+  text: '#202d29',
+  muted: '#5e6a64',
+  faint: '#89938d',
   accent: '#2be58a',
-  accentStrong: '#6ff0b3',
-  accentDark: '#04110b',
+  accentStrong: '#08734f',
+  accentDark: '#06110c',
+  blue: '#166585',
   warning: '#fbbf24',
-  error: '#fecaca',
-  errorBg: 'rgba(127, 29, 29, 0.32)',
-  successBg: 'rgba(16, 185, 129, 0.16)',
+  warningInk: '#8c510c',
+  error: '#aa2323',
+  errorBg: '#fff0ee',
+  successBg: '#e8faf2',
+  backdrop: 'rgba(28, 30, 29, 0.38)',
+  mobileShell: '#f7f8f6',
+  mobileLine: '#dfe7e2',
 }
+export const codeFont = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' })
 
 export interface TabletMetrics {
   width: number
   height: number
   isLandscape: boolean
   isTablet: boolean
-  scale: number
 }
-
-export const createTabletMetrics = (width: number, height: number): TabletMetrics => {
-  const shortestSide = Math.min(width, height)
-  const isTablet = shortestSide >= 600
-  const isLandscape = width > height
-  const scale = isTablet ? Math.min(1.22, Math.max(1, shortestSide / 768)) : 1
-
-  return { width, height, isLandscape, isTablet, scale }
-}
+export const createTabletMetrics = (width: number, height: number): TabletMetrics => ({
+  width, height, isLandscape: width > height, isTablet: Math.min(width, height) >= 600,
+})
 
 interface ActionButtonProps {
   label: string
@@ -45,164 +45,61 @@ interface ActionButtonProps {
   disabled?: boolean
   onPress: () => void
   style?: StyleProp<ViewStyle>
+  testID?: string
 }
-
-export function ActionButton({ label, icon, variant = 'secondary', disabled = false, onPress, style }: ActionButtonProps) {
+export function ActionButton({ label, icon, variant = 'secondary', disabled = false, onPress, style, testID }: ActionButtonProps) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      testID={testID}
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
-        styles.actionButton,
-        variant === 'primary' && styles.actionButtonPrimary,
-        variant === 'ghost' && styles.actionButtonGhost,
-        disabled && styles.disabled,
-        pressed && !disabled && styles.pressed,
-        style,
+        styles.action, variant === 'primary' && styles.primary,
+        variant === 'ghost' && styles.ghost, style,
+        disabled && styles.disabled, pressed && !disabled && styles.pressed,
       ]}
     >
+      {variant === 'primary' && <LinearGradient colors={['#7cf5bc', '#10b981']} style={styles.fill} />}
       {icon}
-      <Text style={[styles.actionButtonText, variant === 'primary' && styles.actionButtonPrimaryText]}>{label}</Text>
+      <Text style={[styles.label, variant === 'primary' && styles.primaryLabel]}>{label}</Text>
     </Pressable>
   )
 }
 
-interface TutorialCalloutProps {
-  title: string
-  body: string
-  nextLabel?: string
-  onNext: () => void
-  onDismiss: () => void
-  style?: StyleProp<ViewStyle>
-}
-
-export function TutorialCallout({ title, body, nextLabel = 'Siguiente', onNext, onDismiss, style }: TutorialCalloutProps) {
+export function IconButton({ label, children, onPress, disabled = false, style }: {
+  label: string; children: ReactNode; onPress: () => void; disabled?: boolean; style?: StyleProp<ViewStyle>
+}) {
   return (
-    <View style={[styles.tutorialCallout, style]}>
-      <Text style={styles.tutorialTitle}>{title}</Text>
-      <Text style={styles.tutorialBody}>{body}</Text>
-      <View style={styles.tutorialActions}>
-        <Pressable onPress={onDismiss} style={styles.tutorialSkipButton}>
-          <Text style={styles.tutorialSkipText}>Omitir</Text>
-        </Pressable>
-        <Pressable onPress={onNext} style={styles.tutorialNextButton}>
-          <Text style={styles.tutorialNextText}>{nextLabel}</Text>
-        </Pressable>
-      </View>
-    </View>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [styles.icon, style, disabled && styles.disabled, pressed && !disabled && styles.pressed]}
+    >{children}</Pressable>
   )
 }
 
-export function MarkdownText({ text, style }: { text: string; style?: StyleProp<TextStyle> }) {
-  const normalizedText = text
-    .replace(/```[a-zA-Z]*\n?/g, '')
-    .replace(/```/g, '')
-    .replace(/`([^`]+)`/g, '$1')
-
-  return <Text style={[styles.markdownText, style]}>{normalizedText}</Text>
-}
-
 const styles = StyleSheet.create({
-  actionButton: {
-    minHeight: 42,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(132, 147, 141, 0.28)',
-    borderRadius: 8,
-    backgroundColor: 'rgba(15, 23, 42, 0.72)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
+  action: {
+    minHeight: 44, minWidth: 0, paddingHorizontal: 12, paddingVertical: 8,
+    borderWidth: 1, borderColor: colors.line, borderRadius: 8,
+    backgroundColor: colors.panelRaised, flexDirection: 'row',
+    alignItems: 'center', justifyContent: 'center', gap: 7, overflow: 'hidden',
   },
-  actionButtonPrimary: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accent,
-    shadowColor: colors.accent,
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
-    elevation: 4,
+  primary: { borderColor: '#34d399', backgroundColor: '#2dd4bf' },
+  ghost: { backgroundColor: 'transparent' },
+  fill: { ...StyleSheet.absoluteFill, borderRadius: 7 },
+  label: { color: colors.text, fontSize: 12, fontWeight: '800', flexShrink: 1, textAlign: 'center' },
+  primaryLabel: { color: colors.accentDark },
+  icon: {
+    width: 40, height: 40, borderWidth: 1, borderColor: colors.line,
+    borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.panelRaised,
   },
-  actionButtonGhost: {
-    backgroundColor: 'transparent',
-  },
-  actionButtonText: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  actionButtonPrimaryText: {
-    color: colors.accentDark,
-  },
-  disabled: {
-    opacity: 0.55,
-  },
-  pressed: {
-    transform: [{ scale: 0.98 }],
-  },
-  tutorialCallout: {
-    position: 'absolute',
-    zIndex: 50,
-    width: 320,
-    maxWidth: '92%',
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.lineStrong,
-    borderRadius: 8,
-    backgroundColor: 'rgba(4, 17, 13, 0.98)',
-    shadowColor: colors.accent,
-    shadowOpacity: 0.25,
-    shadowRadius: 24,
-    elevation: 8,
-  },
-  tutorialTitle: {
-    color: colors.accentStrong,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
-  tutorialBody: {
-    marginTop: 6,
-    color: '#e9fff4',
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '700',
-  },
-  tutorialActions: {
-    marginTop: 12,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-  },
-  tutorialSkipButton: {
-    minHeight: 30,
-    paddingHorizontal: 11,
-    borderWidth: 1,
-    borderColor: 'rgba(132, 147, 141, 0.36)',
-    borderRadius: 7,
-    justifyContent: 'center',
-  },
-  tutorialNextButton: {
-    minHeight: 30,
-    paddingHorizontal: 12,
-    borderRadius: 7,
-    justifyContent: 'center',
-    backgroundColor: colors.accent,
-  },
-  tutorialSkipText: {
-    color: '#cbd5e1',
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  tutorialNextText: {
-    color: colors.accentDark,
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  markdownText: {
-    color: colors.text,
-    fontSize: 14,
-    lineHeight: 20,
-  },
+  disabled: { opacity: 0.45 },
+  pressed: { opacity: 0.75 },
 })

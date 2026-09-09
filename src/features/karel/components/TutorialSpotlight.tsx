@@ -23,6 +23,7 @@ interface SpotlightRect {
 export function TutorialSpotlight({ step, isMobile, onNext, onPrevious, onDismiss }: TutorialSpotlightProps) {
   const panelRef = useRef<HTMLElement>(null);
   const maskId = useId();
+  const visibleSteps: readonly TutorialStep[] = step === 'quickCommands' ? ['quickCommands'] : TUTORIAL_STEPS;
   const [layout, setLayout] = useState<{
     rects: SpotlightRect[];
     left: number;
@@ -39,7 +40,7 @@ export function TutorialSpotlight({ step, isMobile, onNext, onPrevious, onDismis
     const first = targets[0];
     if (!isMobile && first) {
       const bounds = first.getBoundingClientRect();
-      if (step === 'runner' || step === 'compile') {
+      if (step === 'runner' || step === 'reset') {
         first.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       } else if (bounds.top > window.innerHeight - 120) {
         window.scrollBy({ top: bounds.top - 260 });
@@ -160,7 +161,7 @@ export function TutorialSpotlight({ step, isMobile, onNext, onPrevious, onDismis
         tabIndex={-1}
       >
         <header className="spotlight-header">
-          <span>Paso {TUTORIAL_STEPS.indexOf(step) + 1} de {TUTORIAL_STEPS.length}</span>
+          <span>Paso {visibleSteps.indexOf(step) + 1} de {visibleSteps.length}</span>
           <button type="button" aria-label="Cerrar tutorial" onClick={onDismiss}><X size={18} /></button>
         </header>
         <div className="spotlight-copy" aria-live="polite">
@@ -169,8 +170,8 @@ export function TutorialSpotlight({ step, isMobile, onNext, onPrevious, onDismis
         </div>
         <div className="spotlight-actions">
           <button className="spotlight-secondary" type="button" onClick={onDismiss}>Omitir</button>
-          {step !== 'chat' && <button className="spotlight-secondary" type="button" onClick={onPrevious}>Anterior</button>}
-          <button className="spotlight-next" type="button" onClick={onNext}>{step === 'compile' ? 'Finalizar' : 'Siguiente'}</button>
+          {step !== 'chat' && step !== 'quickCommands' && <button className="spotlight-secondary" type="button" onClick={onPrevious}>Anterior</button>}
+          <button className="spotlight-next" type="button" onClick={onNext}>{step === 'reset' || step === 'quickCommands' ? 'Finalizar' : 'Siguiente'}</button>
         </div>
       </section>
     </div>,

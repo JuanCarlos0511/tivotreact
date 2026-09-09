@@ -207,6 +207,10 @@ export interface KarelWorldState {
   bagBeepers: number
 }
 
+export type KarelCommandId = 'avanza' | 'gira-izquierda' | 'coge-ficha' | 'deja-ficha'
+  | 'repetir' | 'si' | 'mientras' | 'define-nueva-instruccion'
+export type KarelCondition = 'frente-libre' | 'junto-a-ficha' | 'orientado-al-norte'
+
 export interface KarelLevel {
   id: number
   mode?: 'challenge'
@@ -215,6 +219,9 @@ export interface KarelLevel {
   objective: string
   gridPosition: KarelGridPosition
   commands: readonly string[]
+  // The toolbox may offer a complete block instead of its individual body commands.
+  quickCommands: readonly KarelCommandId[]
+  conditions: readonly KarelCondition[]
   initialWorld: KarelWorldState
   starterCode: string
   initialMessage: string

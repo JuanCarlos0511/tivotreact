@@ -1,7 +1,10 @@
 import type { ReactNode } from 'react'
+import { ScrollView, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native'
+import { codeFont, colors } from './ui'
 
 interface MarkdownMessageProps {
   text: string
+  style?: StyleProp<TextStyle>
 }
 
 type MarkdownSegment =
@@ -42,14 +45,14 @@ const renderInlineMarkdown = (text: string): ReactNode[] =>
     .filter(Boolean)
     .map((chunk, index) => {
       if (chunk.startsWith('`') && chunk.endsWith('`')) {
-        return <code key={`${chunk}-${index}`}>{chunk.slice(1, -1)}</code>
+        return <Text style={styles.inlineCode} key={`${chunk}-${index}`}>{chunk.slice(1, -1)}</Text>
       }
 
       if (chunk.startsWith('**') && chunk.endsWith('**')) {
-        return <strong key={`${chunk}-${index}`}>{chunk.slice(2, -2)}</strong>
+        return <Text style={styles.bold} key={`${chunk}-${index}`}>{chunk.slice(2, -2)}</Text>
       }
 
-      return <span key={`${chunk}-${index}`}>{renderKeywordText(chunk)}</span>
+      return <Text key={`${chunk}-${index}`}>{renderKeywordText(chunk)}</Text>
     })
 
 const renderKeywordText = (text: string): ReactNode[] => {
@@ -63,24 +66,24 @@ const renderKeywordText = (text: string): ReactNode[] => {
     .filter((chunk) => chunk.length > 0)
     .map((chunk, index) =>
       exactKeywordPattern.test(chunk) ? (
-        <span key={`${chunk}-${index}`} className="code-keyword">
+        <Text key={`${chunk}-${index}`} style={styles.keyword}>
           {chunk}
-        </span>
+        </Text>
       ) : (
-        <span key={`${chunk}-${index}`}>{chunk}</span>
+        <Text key={`${chunk}-${index}`}>{chunk}</Text>
       ),
     )
 }
 
-export function MarkdownMessage({ text }: MarkdownMessageProps) {
+export function MarkdownText({ text, style }: MarkdownMessageProps) {
   return (
-    <>
+    <View style={styles.content}>
       {splitMarkdownSegments(text).map((segment, segmentIndex) => {
         if (segment.kind === 'code') {
           return (
-            <pre key={`code-${segmentIndex}`} className="markdown-code">
-              <code>{segment.content}</code>
-            </pre>
+            <ScrollView horizontal key={`code-${segmentIndex}`} style={styles.codeBlock}>
+              <Text selectable style={styles.codeText}>{segment.content}</Text>
+            </ScrollView>
           )
         }
 
@@ -88,11 +91,21 @@ export function MarkdownMessage({ text }: MarkdownMessageProps) {
           .split(/\n{2,}/)
           .filter((paragraph) => paragraph.trim().length > 0)
           .map((paragraph, paragraphIndex) => (
-            <p key={`paragraph-${segmentIndex}-${paragraphIndex}`}>
+            <Text selectable style={[styles.paragraph, style]} key={`paragraph-${segmentIndex}-${paragraphIndex}`}>
               {renderInlineMarkdown(paragraph.trim())}
-            </p>
+            </Text>
           ))
       })}
-    </>
+    </View>
   )
 }
+
+const styles = StyleSheet.create({
+  content: { gap: 8, minWidth: 0 },
+  paragraph: { color: colors.text, fontSize: 14, lineHeight: 21 },
+  bold: { fontWeight: '800' },
+  inlineCode: { fontFamily: codeFont, color: colors.accentStrong, backgroundColor: colors.successBg },
+  keyword: { color: colors.accentStrong, fontWeight: '700' },
+  codeBlock: { backgroundColor: colors.panelSoft, borderRadius: 7, borderWidth: 1, borderColor: colors.line },
+  codeText: { padding: 10, color: colors.text, fontFamily: codeFont, fontSize: 12, lineHeight: 19 },
+})

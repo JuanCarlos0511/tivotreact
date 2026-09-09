@@ -1,327 +1,176 @@
-import * as ScreenOrientation from 'expo-screen-orientation'
+import { LinearGradient } from 'expo-linear-gradient'
 import { StatusBar } from 'expo-status-bar'
-import { ArrowLeft } from 'lucide-react-native'
-import { useEffect, useMemo, useState } from 'react'
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
-import { enableScreens } from 'react-native-screens'
+import { ArrowLeft, Backpack, Lightbulb, MessageCircle } from 'lucide-react-native'
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { AppState, BackHandler, KeyboardAvoidingView, Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import { SafeAreaProvider, SafeAreaView, useSafeAreaFrame } from 'react-native-safe-area-context'
 import { ChatPanel } from './src/components/ChatPanel'
+import { GameHelpDialog } from './src/components/GameHelpDialog'
 import { KarelBoard } from './src/components/KarelBoard'
-import { KarelCodeEditor, type KarelTutorialFocus } from './src/components/KarelCodeEditor'
+import { KarelCodeEditor } from './src/components/KarelCodeEditor'
 import { LevelSelectScreen } from './src/components/LevelSelectScreen'
+import { ResponsiveDialog } from './src/components/ResponsiveDialog'
 import { StartScreen } from './src/components/StartScreen'
-import { createTabletMetrics, colors } from './src/components/ui'
+import { IconButton, createTabletMetrics, colors, type TabletMetrics } from './src/components/ui'
 import { useTivotChat } from './src/features/chat/hooks'
+import { codeHistoryReducer, createCodeHistory, type CodeHistoryAction } from './src/features/karel/editor/code-history'
+import { getInitialTutorialStepForLevel, getTutorialStepsForLevel, hasSeenLevelHelp, markLevelHelpSeen, type TutorialStep } from './src/features/karel/editor/tutorial'
 import { useKarelRunner } from './src/features/karel/hooks/use-karel-runner'
 import type { KarelLevel } from './src/shared/types'
 
-enableScreens(true)
-
 type AppScreen = 'START' | 'LEVEL_SELECT' | 'WORKSPACE'
-type LevelOneTutorialStep = 'chat' | 'code' | 'runner' | 'compile'
-
-const LEVEL_ONE_TUTORIAL_STEPS: LevelOneTutorialStep[] = ['chat', 'code', 'runner', 'compile']
 
 export default function App() {
-  const { width, height } = useWindowDimensions()
+  return <SafeAreaProvider><TabletApp /></SafeAreaProvider>
+}
+
+function TabletApp() {
+  // The safe-area frame follows tablet rotation without switching layout when the keyboard resizes Android's window.
+  const safeAreaFrame = useSafeAreaFrame()
+  const windowDimensions = useWindowDimensions()
+  const { width, height } = Platform.OS === 'web' ? windowDimensions : safeAreaFrame
   const metrics = useMemo(() => createTabletMetrics(width, height), [width, height])
   const [screen, setScreen] = useState<AppScreen>('START')
   const [activeLevel, setActiveLevel] = useState<KarelLevel | null>(null)
   const chat = useTivotChat(activeLevel)
-
   useEffect(() => {
-    void ScreenOrientation.unlockAsync()
-  }, [])
-
-  const handleSelectLevel = (level: KarelLevel) => {
-    setActiveLevel(level)
-    setScreen('WORKSPACE')
-  }
-
-  const handleBackToLevels = () => {
-    setScreen('LEVEL_SELECT')
-  }
-
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (screen === 'START') return false
+      setScreen(screen === 'WORKSPACE' ? 'LEVEL_SELECT' : 'START')
+      return true
+    })
+    return () => subscription.remove()
+  }, [screen])
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar style="light" />
-        <KeyboardAvoidingView
-          style={styles.keyboardAvoidingView}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <View style={styles.shell}>
-            {screen === 'START' && <StartScreen metrics={metrics} onStart={() => setScreen('LEVEL_SELECT')} />}
-            {screen === 'LEVEL_SELECT' && (
-              <LevelSelectScreen metrics={metrics} onBack={() => setScreen('START')} onSelectLevel={handleSelectLevel} />
-            )}
-            {screen === 'WORKSPACE' && activeLevel && (
-              <WorkspaceScreen
-                metrics={metrics}
-                activeLevel={activeLevel}
-                session={chat.activeSession}
-                query={chat.query}
-                isResponding={chat.isResponding}
-                onBackToLevels={handleBackToLevels}
-                onQueryChange={chat.setQuery}
-                onSubmitMessage={chat.submitMessage}
-                onSelectQuickReply={chat.submitQuickReply}
-                onSubmitFlowOrder={chat.submitFlowOrder}
-              />
-            )}
-          </View>
-        </KeyboardAvoidingView>
+    <LinearGradient colors={['#f7f2ea', '#f1ece3', '#ece5da']} style={styles.fill}>
+      <SafeAreaView style={[styles.fill, screen === 'WORKSPACE' && !metrics.isLandscape && styles.portraitShell]}>
+        <StatusBar style="dark" />
+        {screen === 'START' && <StartScreen metrics={metrics} onStart={() => setScreen('LEVEL_SELECT')} />}
+        {screen === 'LEVEL_SELECT' && <LevelSelectScreen metrics={metrics} onBack={() => setScreen('START')}
+          onSelectLevel={level => { setActiveLevel(level); setScreen('WORKSPACE') }} />}
+        {screen === 'WORKSPACE' && activeLevel && (
+          <WorkspaceScreen key={activeLevel.id} metrics={metrics} activeLevel={activeLevel} chat={chat}
+            onBackToLevels={() => setScreen('LEVEL_SELECT')} />
+        )}
       </SafeAreaView>
-    </SafeAreaProvider>
+    </LinearGradient>
   )
 }
 
-interface WorkspaceScreenProps {
-  metrics: ReturnType<typeof createTabletMetrics>
-  activeLevel: KarelLevel
-  session: ReturnType<typeof useTivotChat>['activeSession']
-  query: string
-  isResponding: boolean
-  onBackToLevels: () => void
-  onQueryChange: (query: string) => void
-  onSubmitMessage: () => Promise<void>
-  onSelectQuickReply: (optionText: string) => Promise<void>
-  onSubmitFlowOrder: (messageId: string, problemId: string, submittedOrder: string[]) => Promise<void>
-}
-
-function WorkspaceScreen({
-  metrics,
-  activeLevel,
-  session,
-  query,
-  isResponding,
-  onBackToLevels,
-  onQueryChange,
-  onSubmitMessage,
-  onSelectQuickReply,
-  onSubmitFlowOrder,
-}: WorkspaceScreenProps) {
-  const [code, setCode] = useState(activeLevel.starterCode)
-  const [tutorialStep, setTutorialStep] = useState<LevelOneTutorialStep | null>(
-    activeLevel.id === 1 ? 'chat' : null,
+function WorkspaceScreen({ metrics, activeLevel, chat, onBackToLevels }: {
+  metrics: TabletMetrics; activeLevel: KarelLevel; chat: ReturnType<typeof useTivotChat>; onBackToLevels: () => void
+}) {
+  const [history, dispatch] = useReducer(codeHistoryReducer, activeLevel.starterCode, createCodeHistory)
+  const [isChatOpen, setChatOpen] = useState(false)
+  const initialTutorialStep = !hasSeenLevelHelp(activeLevel.id)
+    ? getInitialTutorialStepForLevel(activeLevel.id)
+    : null
+  const [helpOpen, setHelpOpen] = useState(() => !hasSeenLevelHelp(activeLevel.id))
+  const [tutorialStep, setTutorialStep] = useState<TutorialStep | null>(
+    () => initialTutorialStep,
   )
+  const [availableHeight, setAvailableHeight] = useState(metrics.height)
   const runner = useKarelRunner(activeLevel.initialWorld)
-  const editorTutorialFocus: KarelTutorialFocus =
-    tutorialStep === 'code' || tutorialStep === 'runner' || tutorialStep === 'compile' ? tutorialStep : null
-
+  const tutorialSteps = getTutorialStepsForLevel(activeLevel.id)
+  const editorTutorialFocus = tutorialStep === 'quickCommands' ? tutorialStep : null
+  const pauseRef = useRef(runner.pauseExecution)
+  pauseRef.current = runner.pauseExecution
   useEffect(() => {
-    setCode(activeLevel.starterCode)
-    setTutorialStep(activeLevel.id === 1 ? 'chat' : null)
-    runner.resetExecution()
-  }, [activeLevel])
-
-  const advanceTutorial = () => {
-    if (!tutorialStep) return
-
-    const currentIndex = LEVEL_ONE_TUTORIAL_STEPS.indexOf(tutorialStep)
-    setTutorialStep(LEVEL_ONE_TUTORIAL_STEPS[currentIndex + 1] ?? null)
-  }
-
-  const dismissTutorial = () => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state !== 'active') pauseRef.current()
+    })
+    return () => subscription.remove()
+  }, [])
+  const closeHelp = () => {
+    setHelpOpen(false)
     setTutorialStep(null)
+    markLevelHelpSeen(activeLevel.id)
   }
-
-  const resetCodeAndWorld = () => {
-    setCode(activeLevel.starterCode)
+  const nextTutorial = () => {
+    if (!tutorialStep) return
+    const next = tutorialSteps[tutorialSteps.indexOf(tutorialStep) + 1] ?? null
+    if (next) setTutorialStep(next)
+    else closeHelp()
+  }
+  const openHelp = () => {
+    runner.pauseExecution()
+    setHelpOpen(true)
+  }
+  const changeCode = (action: CodeHistoryAction) => {
+    if (runner.isRunning) return
+    dispatch(action)
     runner.resetExecution()
   }
-
-  const handleCodeChange = (nextCode: string) => {
-    setCode(nextCode)
-    if (!runner.isRunning) runner.resetExecution()
-  }
-
+  const reset = runner.resetExecution
+  const portrait = !metrics.isLandscape
+  const boardWidth = portrait
+    ? Math.max(130, Math.min(metrics.width - 32, availableHeight * (metrics.isTablet ? 0.36 : 0.28), 410))
+    : Math.min(350, metrics.width * 0.25)
   return (
-    <View style={styles.workspace}>
-      <View style={styles.workspaceHeader}>
-        <Pressable onPress={onBackToLevels} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-          <ArrowLeft color={colors.muted} size={18} />
-          <Text style={styles.backButtonText}>Volver</Text>
-        </Pressable>
-        <View style={styles.levelCopy}>
-          <Text style={styles.levelBadge}>Nivel {activeLevel.id}</Text>
-          <Text style={styles.levelTitle}>{activeLevel.title.replace(/^Nivel \d+: /, '')}</Text>
-          <Text numberOfLines={2} style={styles.levelObjective}>
-            {activeLevel.objective}
-          </Text>
-        </View>
-      </View>
-
-      <View style={[styles.workspaceBody, metrics.isLandscape && styles.workspaceBodyLandscape]}>
-        <View
-          style={[
-            styles.activityPane,
-            metrics.isLandscape && styles.activityPaneLandscape,
-            tutorialStep === 'chat' && styles.dimmedTutorialSection,
-            editorTutorialFocus && styles.raisedTutorialPane,
-          ]}
-        >
-          <View style={editorTutorialFocus && styles.dimmedTutorialSection}>
-            <KarelBoard metrics={metrics} world={runner.worldState} />
+    <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View testID={portrait ? 'workspace-portrait' : 'workspace-landscape'}
+        onLayout={event => setAvailableHeight(event.nativeEvent.layout.height)}
+        style={[styles.workspace, portrait && styles.workspacePortrait]}>
+        <View style={styles.header}>
+          <IconButton label="Volver a niveles" onPress={onBackToLevels}><ArrowLeft size={18} color={colors.muted} /></IconButton>
+          <View style={styles.levelCopy}>
+            <Text style={styles.levelBadge}>{activeLevel.mode === 'challenge' ? 'Desafío' : 'Nivel ' + activeLevel.id}</Text>
+            <Text numberOfLines={2} style={styles.levelTitle}>{activeLevel.title.replace(/^Nivel \d+: /, '')}</Text>
           </View>
-          <KarelCodeEditor
-            metrics={metrics}
-            code={code}
-            activeLineNumber={runner.activeLineNumber}
-            compileResult={runner.compileResult}
-            executionError={runner.executionError}
-            isRunning={runner.isRunning}
-            isPaused={runner.isPaused}
-            speedMultiplier={runner.speedMultiplier}
-            tutorialFocus={editorTutorialFocus}
-            onChange={handleCodeChange}
-            onCompile={() => runner.compileCode(code)}
-            onRun={() => runner.runCode(code)}
-            onReset={resetCodeAndWorld}
-            onPauseToggle={runner.togglePause}
-            onStepBack={runner.stepBack}
-            onStepForward={() => runner.stepForward(code)}
-            onSpeedChange={runner.setSpeedMultiplier}
-            onTutorialNext={advanceTutorial}
-            onTutorialDismiss={dismissTutorial}
-          />
+          {portrait && <IconButton label="Objetivos y tutorial" onPress={openHelp}><Lightbulb size={18} color={colors.accentStrong} /></IconButton>}
+          <View accessibilityLabel={'Mochila: ' + runner.worldState.bagBeepers + ' fichas'} style={styles.bag}>
+            <Backpack size={20} color={colors.accentStrong} />
+            <Text testID="bag-count" style={styles.bagCount}>{runner.worldState.bagBeepers}</Text>
+          </View>
+          <IconButton label="Abrir chat tutor" onPress={() => setChatOpen(true)} style={styles.chatButton}>
+            <MessageCircle size={22} color={colors.accentStrong} />
+          </IconButton>
         </View>
-
-        <View
-          style={[
-            styles.chatPane,
-            metrics.isLandscape && styles.chatPaneLandscape,
-            tutorialStep === 'chat' && styles.raisedTutorialPane,
-            editorTutorialFocus && styles.dimmedTutorialSection,
-          ]}
-        >
-          <ChatPanel
-            metrics={metrics}
-            session={session}
-            query={query}
-            isResponding={isResponding}
-            tutorialActive={tutorialStep === 'chat'}
-            onQueryChange={onQueryChange}
-            onSubmitMessage={onSubmitMessage}
-            onSelectQuickReply={onSelectQuickReply}
-            onSubmitFlowOrder={onSubmitFlowOrder}
-            onTutorialNext={advanceTutorial}
-            onTutorialDismiss={dismissTutorial}
-          />
+        <View style={[styles.body, portrait && styles.bodyPortrait]}>
+          <View style={[styles.boardPane, { width: boardWidth }, portrait && styles.boardPortrait]}><KarelBoard world={runner.worldState} isRunning={runner.isRunning} hasError={Boolean(runner.executionError || runner.compileResult?.error)} wallCollision={Boolean(runner.executionError?.includes('muro'))} /></View>
+          <KarelCodeEditor quickCommands={activeLevel.quickCommands} conditions={activeLevel.conditions} metrics={metrics} code={history.code} activeLineNumber={runner.activeLineNumber} activeLoops={runner.activeLoops}
+            compileResult={runner.compileResult} executionError={runner.executionError}
+            isRunning={runner.isRunning} isPaused={runner.isPaused} speedMultiplier={runner.speedMultiplier}
+            onChange={code => changeCode({ type: 'change', code })}
+            canUndo={history.past.length > 0} canRedo={history.future.length > 0}
+            onUndo={() => changeCode({ type: 'undo' })} onRedo={() => changeCode({ type: 'redo' })}
+            onRun={() => runner.runCode(history.code)}
+            onReset={reset} onHelp={openHelp} onPauseToggle={runner.togglePause}
+            onStepBack={runner.stepBack} onStepForward={() => runner.stepForward(history.code)}
+            onSpeedChange={runner.setSpeedMultiplier} tutorialFocus={editorTutorialFocus}
+            onTutorialNext={nextTutorial} onTutorialDismiss={closeHelp} />
         </View>
+        <ResponsiveDialog visible={isChatOpen} onClose={() => setChatOpen(false)} label="Chat tutor de Karel"
+          placement={portrait ? 'bottom' : 'right'} style={portrait ? styles.chatPortrait : undefined}>
+          <ChatPanel session={chat.activeSession} query={chat.query} isResponding={chat.isResponding}
+            onClose={() => setChatOpen(false)} onQueryChange={chat.setQuery} onSubmitMessage={chat.submitMessage}
+            onSelectQuickReply={chat.submitQuickReply} onSubmitFlowOrder={chat.submitFlowOrder} />
+        </ResponsiveDialog>
+        <GameHelpDialog visible={helpOpen && editorTutorialFocus === null} portrait={portrait} objective={activeLevel.objective} step={tutorialStep}
+          onClose={closeHelp} onNext={nextTutorial} onRestart={() => setTutorialStep(getInitialTutorialStepForLevel(activeLevel.id) ?? 'chat')}
+          onPrevious={() => {
+            if (tutorialStep) setTutorialStep(tutorialSteps[Math.max(0, tutorialSteps.indexOf(tutorialStep) - 1)] ?? tutorialSteps[0] ?? 'chat')
+          }} />
       </View>
-
-      {tutorialStep && <View pointerEvents="none" style={styles.tutorialScrim} />}
-    </View>
+    </KeyboardAvoidingView>
   )
 }
-
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.shell,
-  },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  shell: {
-    flex: 1,
-    backgroundColor: colors.shell,
-  },
-  workspace: {
-    flex: 1,
-    padding: 14,
-    gap: 12,
-    backgroundColor: colors.shell,
-  },
-  workspaceHeader: {
-    minHeight: 66,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  backButton: {
-    minHeight: 42,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 8,
-    backgroundColor: 'rgba(18, 23, 21, 0.72)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-  },
-  backButtonText: {
-    color: colors.muted,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  levelCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  levelBadge: {
-    color: colors.accent,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  levelTitle: {
-    marginTop: 2,
-    color: colors.text,
-    fontSize: 22,
-    fontWeight: '900',
-  },
-  levelObjective: {
-    marginTop: 4,
-    color: colors.muted,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '700',
-  },
-  workspaceBody: {
-    flex: 1,
-    minHeight: 0,
-    gap: 12,
-  },
-  workspaceBodyLandscape: {
-    flexDirection: 'row',
-  },
-  activityPane: {
-    flex: 1,
-    minHeight: 0,
-    gap: 12,
-  },
-  activityPaneLandscape: {
-    flex: 1.24,
-  },
-  chatPane: {
-    flex: 0.72,
-    minHeight: 260,
-  },
-  chatPaneLandscape: {
-    flex: 0.76,
-    maxWidth: 470,
-    minHeight: 0,
-  },
-  raisedTutorialPane: {
-    zIndex: 30,
-  },
-  dimmedTutorialSection: {
-    opacity: 0.32,
-  },
-  tutorialScrim: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.64)',
-  },
-  pressed: {
-    transform: [{ scale: 0.985 }],
-  },
+  fill: { flex: 1 },
+  portraitShell: { backgroundColor: colors.mobileShell },
+  workspace: { flex: 1, width: '100%', maxWidth: 1480, alignSelf: 'center', padding: 20, gap: 16 },
+  workspacePortrait: { padding: 0, gap: 6 },
+  header: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8 },
+  levelCopy: { flex: 1, minWidth: 0, gap: 2 },
+  levelBadge: { color: colors.accentStrong, fontSize: 10, fontWeight: '900', textTransform: 'uppercase' },
+  levelTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
+  reset: { borderRadius: 22 },
+  bag: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: '#b8dfcf', backgroundColor: '#effbf5', alignItems: 'center', justifyContent: 'center' },
+  bagCount: { position: 'absolute', right: -3, top: -3, minWidth: 18, minHeight: 18, paddingHorizontal: 3, borderRadius: 9, overflow: 'hidden', color: '#ffffff', backgroundColor: colors.accentStrong, fontSize: 10, fontWeight: '900', textAlign: 'center' },
+  chatButton: { width: 44, height: 44, borderRadius: 22, borderColor: '#84d7b7' },
+  body: { flex: 1, minHeight: 0, flexDirection: 'row', gap: 16 },
+  bodyPortrait: { flexDirection: 'column', gap: 6 },
+  boardPane: { alignSelf: 'flex-start', flexShrink: 0 },
+  boardPortrait: { alignSelf: 'center' },
+  chatPortrait: { height: '78%' },
 })

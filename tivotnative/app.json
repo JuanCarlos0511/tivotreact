@@ -6,7 +6,7 @@
     "orientation": "default",
     "supportsTablet": true,
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
       "requireFullScreen": false

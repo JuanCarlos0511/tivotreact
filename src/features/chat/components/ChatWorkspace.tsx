@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Backpack, Lightbulb } from 'lucide-react'
 import type { KarelLevel, TivotChatSession } from '@shared/types'
 import { KarelCodeEditor } from '@features/karel/components/KarelCodeEditor'
 import { KarelGrid8x8 } from '@features/karel/components/KarelGrid8x8'
 import { useKarelRunner } from '@features/karel/hooks/use-karel-runner'
 import { useIsMobile } from '@features/karel/hooks/use-is-mobile'
 import { GameHelpDialog } from '@features/karel/components/GameHelpDialog'
-import { hasSeenLevelHelp, markLevelHelpSeen, TUTORIAL_COPY, TUTORIAL_STEPS } from '@features/karel/editor/tutorial'
+import { getInitialTutorialStepForLevel, getTutorialStepsForLevel, hasSeenLevelHelp, markLevelHelpSeen, TUTORIAL_COPY } from '@features/karel/editor/tutorial'
 import type { TutorialStep } from '@features/karel/editor/tutorial'
 import { FloatingChatDrawer } from './FloatingChatDrawer'
 
@@ -39,16 +39,18 @@ export function ChatWorkspace({
     future: [],
   })
   const [isChatOpen, setIsChatOpen] = useState(false)
-  const [showObjective, setShowObjective] = useState(() => !hasSeenLevelHelp(activeLevel.id))
+  const initialTutorialStep = !hasSeenLevelHelp(activeLevel.id)
+    ? getInitialTutorialStepForLevel(activeLevel.id)
+    : null
+  const [showObjective, setShowObjective] = useState(() => !hasSeenLevelHelp(activeLevel.id) && initialTutorialStep === null)
   const [tutorialStep, setTutorialStep] = useState<TutorialStep | null>(
-    () => activeLevel.id === 1 && !hasSeenLevelHelp(activeLevel.id) ? 'chat' : null,
+    () => initialTutorialStep,
   )
   const isMobile = useIsMobile()
   const runner = useKarelRunner(activeLevel.initialWorld)
   const isChatTutorialStep = tutorialStep === 'chat'
-  const editorTutorialFocus = tutorialStep === 'code' || tutorialStep === 'runner' || tutorialStep === 'compile'
-    ? tutorialStep
-    : null
+  const tutorialSteps = getTutorialStepsForLevel(activeLevel.id)
+  const editorTutorialFocus = tutorialStep === 'quickCommands' ? tutorialStep : null
   const chatPrompt = isChatTutorialStep
     ? 'Conoce a Tivot: sera tu guia de apoyo para aprender a programar paso a paso durante este reto.'
     : activeLevel.objective
@@ -62,16 +64,19 @@ export function ChatWorkspace({
     setCode(activeLevel.starterCode)
     setCodeHistory({ past: [], future: [] })
     setIsChatOpen(false)
-    setShowObjective(!hasSeenLevelHelp(activeLevel.id))
-    setTutorialStep(activeLevel.id === 1 && !hasSeenLevelHelp(activeLevel.id) ? 'chat' : null)
+    const nextTutorialStep = !hasSeenLevelHelp(activeLevel.id)
+      ? getInitialTutorialStepForLevel(activeLevel.id)
+      : null
+    setShowObjective(!hasSeenLevelHelp(activeLevel.id) && nextTutorialStep === null)
+    setTutorialStep(nextTutorialStep)
     runner.resetExecution()
   }, [activeLevel])
 
   const advanceTutorial = () => {
     if (!tutorialStep) return
 
-    const currentIndex = TUTORIAL_STEPS.indexOf(tutorialStep)
-    const nextStep = TUTORIAL_STEPS[currentIndex + 1] ?? null
+    const currentIndex = tutorialSteps.indexOf(tutorialStep)
+    const nextStep = tutorialSteps[currentIndex + 1] ?? null
     setTutorialStep(nextStep)
     setShowObjective(false)
     if (!nextStep) markLevelHelpSeen(activeLevel.id)
@@ -79,8 +84,8 @@ export function ChatWorkspace({
 
   const previousTutorial = () => {
     if (!tutorialStep) return
-    const currentIndex = TUTORIAL_STEPS.indexOf(tutorialStep)
-    setTutorialStep(TUTORIAL_STEPS[Math.max(0, currentIndex - 1)] ?? 'chat')
+    const currentIndex = tutorialSteps.indexOf(tutorialStep)
+    setTutorialStep(tutorialSteps[Math.max(0, currentIndex - 1)] ?? tutorialSteps[0] ?? 'chat')
   }
 
   const dismissTutorial = () => {
@@ -94,16 +99,7 @@ export function ChatWorkspace({
     setShowObjective(true)
   }
 
-  const resetCodeAndWorld = () => {
-    if (code !== activeLevel.starterCode) {
-      setCodeHistory((history) => ({
-        past: [...history.past, code].slice(-50),
-        future: [],
-      }))
-    }
-    setCode(activeLevel.starterCode)
-    runner.resetExecution()
-  }
+  const resetCodeAndWorld = runner.resetExecution
 
   const handleCodeChange = (nextCode: string) => {
     if (nextCode === code) return
@@ -141,7 +137,6 @@ export function ChatWorkspace({
 
   return (
     <section className={`karel-workspace ${tutorialStep ? 'karel-workspace-tutorial' : ''}`}>
-      {tutorialStep && !isMobile && <div className="tutorial-backdrop" aria-hidden="true" />}
       <header className="karel-game-header">
         <button className="workspace-back-button" type="button" onClick={onBackToLevels} aria-label="Volver a niveles">
           <ArrowLeft size={16} />
@@ -149,15 +144,34 @@ export function ChatWorkspace({
         </button>
         <div className="workspace-level-copy">
           <span className="workspace-level-badge">{activeLevel.mode === 'challenge' ? 'Desafío' : `Nivel ${activeLevel.id}`}</span>
-          <h1>{activeLevel.title.replace(/^Nivel \d+: /, '')}</h1>
+          <div className="workspace-level-title-row">
+            <h1>{activeLevel.title.replace(/^Nivel \d+: /, '')}</h1>
+            {activeLevel.id >= 4 && (
+              <div
+                className="workspace-bag-indicator"
+                aria-label={`Mochila: ${runner.worldState.bagBeepers} fichas`}
+                title={`Mochila: ${runner.worldState.bagBeepers} fichas`}
+              >
+                <Backpack size={17} aria-hidden="true" />
+                <span>{runner.worldState.bagBeepers}</span>
+              </div>
+            )}
+          </div>
         </div>
+        <button className="workspace-back-button" type="button" onClick={openHelp} aria-label="Objetivos y tutorial" title="Objetivos y tutorial">
+          <Lightbulb size={18} />
+        </button>
       </header>
 
-      <KarelGrid8x8 world={runner.worldState} />
+      <KarelGrid8x8 world={runner.worldState} isRunning={runner.isRunning} hasError={Boolean(runner.executionError || runner.compileResult?.error)} wallCollision={Boolean(runner.executionError?.includes('muro'))} />
 
       <KarelCodeEditor
+        levelId={activeLevel.id}
+        quickCommands={activeLevel.quickCommands}
+        conditions={activeLevel.conditions}
         code={code}
         activeLineNumber={runner.activeLineNumber}
+        activeLoops={runner.activeLoops}
         compileResult={runner.compileResult}
         executionError={runner.executionError}
         isRunning={runner.isRunning}
@@ -170,14 +184,13 @@ export function ChatWorkspace({
         onRedo={redoCodeChange}
         canUndo={codeHistory.past.length > 0}
         canRedo={codeHistory.future.length > 0}
-        onCompile={() => runner.compileCode(code)}
         onRun={() => runner.runCode(code)}
         onReset={resetCodeAndWorld}
         onPauseToggle={runner.togglePause}
         onStepBack={runner.stepBack}
         onStepForward={() => runner.stepForward(code)}
         onSpeedChange={runner.setSpeedMultiplier}
-        tutorialFocus={isMobile ? null : editorTutorialFocus}
+        tutorialFocus={editorTutorialFocus}
         onTutorialNext={advanceTutorial}
         onTutorialPrevious={previousTutorial}
         onTutorialDismiss={dismissTutorial}
@@ -189,7 +202,7 @@ export function ChatWorkspace({
         isResponding={isResponding}
         isOpen={isChatOpen}
         objective={chatPrompt}
-        showObjective={!isMobile && (isChatTutorialStep || showObjective)}
+        showObjective={false}
         isIntroPrompt={isChatTutorialStep}
         onContinueIntro={advanceTutorial}
         onDismissIntro={dismissTutorial}
@@ -203,12 +216,12 @@ export function ChatWorkspace({
       />
 
       <GameHelpDialog
-        isOpen={isMobile && (showObjective || tutorialStep !== null)}
+        isOpen={showObjective || (tutorialStep !== null && editorTutorialFocus === null)}
         title={tutorialStep ? TUTORIAL_COPY[tutorialStep].title : 'Objetivo del nivel'}
         onClose={dismissTutorial}
       >
         {tutorialStep && (
-          <p className="game-help-progress">Paso {TUTORIAL_STEPS.indexOf(tutorialStep) + 1} de {TUTORIAL_STEPS.length}</p>
+          <p className="game-help-progress">Paso {tutorialSteps.indexOf(tutorialStep) + 1} de {tutorialSteps.length}</p>
         )}
         {(!tutorialStep || tutorialStep === 'chat') && (
           <p className="game-help-objective">{activeLevel.objective}</p>
@@ -221,12 +234,12 @@ export function ChatWorkspace({
               <button className="tutorial-skip-button" type="button" onClick={previousTutorial}>Anterior</button>
             )}
             <button className="tutorial-next-button" type="button" onClick={advanceTutorial}>
-              {tutorialStep === 'compile' ? 'Finalizar' : 'Siguiente'}
+              {tutorialStep === 'reset' ? 'Finalizar' : 'Siguiente'}
             </button>
           </div>
         ) : (
           <div className="game-help-actions">
-            <button className="tutorial-skip-button" type="button" onClick={() => setTutorialStep('chat')}>Ver tutorial</button>
+            <button className="tutorial-skip-button" type="button" onClick={() => setTutorialStep(getInitialTutorialStepForLevel(activeLevel.id) ?? 'chat')}>Ver tutorial</button>
             <button className="tutorial-next-button" type="button" onClick={dismissTutorial}>Entendido</button>
           </div>
         )}

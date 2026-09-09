@@ -36,20 +36,8 @@ export const getInitialTutorialStepForLevel = (levelId: number): TutorialStep | 
 
 const seenLevels = new Set<number>();
 
-export const hasSeenLevelHelp = (levelId: number): boolean => {
-  if (seenLevels.has(levelId)) return true;
-  try {
-    return sessionStorage.getItem(`tivot-level-help:${levelId}`) === 'seen';
-  } catch {
-    return false;
-  }
-};
+export const hasSeenLevelHelp = (levelId: number): boolean => seenLevels.has(levelId);
 
 export const markLevelHelpSeen = (levelId: number) => {
   seenLevels.add(levelId);
-  try {
-    sessionStorage.setItem(`tivot-level-help:${levelId}`, 'seen');
-  } catch {
-    // The in-memory set still remembers dismissed help when storage is unavailable.
-  }
 };

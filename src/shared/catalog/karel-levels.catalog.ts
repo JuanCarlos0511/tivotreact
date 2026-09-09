@@ -5,9 +5,11 @@ export const KAREL_LEVELS: KarelLevel[] = [
     id: 1,
     title: "Nivel 1: Primeros Pasos",
     subtitle: "Movimiento básico línea recta",
-    objective: "Avanza desde la esquina inferior izquierda (1,1) hasta la esquina inferior derecha (1,8) y apaga a Karel.",
+    objective: "Avanza desde la esquina inferior izquierda (1,1) hasta la esquina inferior derecha (1,8).",
     gridPosition: 'top-left',
-    commands: ['avanza;', 'apagate;'],
+    commands: ['avanza;'],
+    quickCommands: ['avanza'],
+    conditions: [],
     initialWorld: {
       karelPosition: { street: 1, avenue: 1 },
       karelDirection: 'ESTE',
@@ -15,12 +17,9 @@ export const KAREL_LEVELS: KarelLevel[] = [
       bagBeepers: 0,
     },
     starterCode: `iniciar-programa
-  inicia-ejecucion
-    avanza;
-    apagate;
-  termina-ejecucion
+  avanza;
 finalizar-programa`,
-    initialMessage: "¡Bienvenido a Karel el Robot! En este primer nivel aprenderás a moverte en línea recta. Tu meta es llevar a Karel desde la esquina (1,1) hasta la (1,8) utilizando únicamente la instrucción `avanza;` consecutivamente y terminar con `apagate;`.",
+    initialMessage: "¡Bienvenido a Karel el Robot! En este primer nivel aprenderás a moverte en línea recta. Tu meta es llevar a Karel desde la esquina (1,1) hasta la (1,8) utilizando únicamente la instrucción `avanza;` consecutivamente.",
   },
   {
     id: 2,
@@ -28,7 +27,9 @@ finalizar-programa`,
     subtitle: "Uso de bucles repetir/veces",
     objective: "Llega de la esquina (1,1) a la (1,8) optimizando tu código con la estructura 'repetir N veces'.",
     gridPosition: 'top-right',
-    commands: ['repetir N veces'],
+    commands: ['repetir N veces', 'avanza;'],
+    quickCommands: ['repetir', 'avanza'],
+    conditions: [],
     initialWorld: {
       karelPosition: { street: 1, avenue: 1 },
       karelDirection: 'ESTE',
@@ -36,22 +37,21 @@ finalizar-programa`,
       bagBeepers: 0,
     },
     starterCode: `iniciar-programa
-  inicia-ejecucion
-    repetir 7 veces inicio
-      avanza;
-    fin;
-    apagate;
-  termina-ejecucion
+  repetir 7 veces inicio
+    avanza;
+  fin;
 finalizar-programa`,
-    initialMessage: "¡Nivel 2! En lugar de escribir `avanza;` 7 veces seguidas, podemos usar una estructura de control para repetir instrucciones:\n\n```pascal\nrepetir 7 veces inicio\n  avanza;\nfin;\n```\n\nPrueba a compilar y ejecutar para ver cómo Karel recorre la calle con menos líneas de código.",
+    initialMessage: "¡Nivel 2! En lugar de escribir `avanza;` 7 veces seguidas, podemos usar una estructura de control para repetir instrucciones:\n\n```pascal\nrepetir 7 veces inicio\n  avanza;\nfin;\n```\n\nEl botón Repite ya incluye `avanza;` dentro del bloque. Cambia el número de veces y ejecuta para ver cómo Karel recorre la calle con menos líneas de código.",
   },
   {
     id: 3,
-    title: "Nivel 3: Decisiones y Contorno",
-    subtitle: "Recorrer el perímetro del mapa",
-    objective: "Recorre el contorno completo del mapa 8x8 dando la vuelta entera hasta regresar al inicio (1,1). Usa repeticiones para avanzar y decisiones con giros al llegar a cada pared.",
+    title: "Nivel 3: Giros y Contorno",
+    subtitle: "Giros y repeticiones en el perímetro",
+    objective: "Recorre el contorno completo del mapa 8x8 dando la vuelta entera hasta regresar al inicio (1,1). Combina 'repetir' y 'avanza' para recorrer cada lado, y 'gira-izquierda' para cambiar de dirección en las esquinas.",
     gridPosition: 'bottom-left',
-    commands: ['si frente-bloqueado', 'gira-izq;'],
+    commands: ['avanza;', 'gira-izquierda;', 'repetir N veces'],
+    quickCommands: ['avanza', 'gira-izquierda', 'repetir'],
+    conditions: [],
     initialWorld: {
       karelPosition: { street: 1, avenue: 1 },
       karelDirection: 'ESTE',
@@ -59,25 +59,24 @@ finalizar-programa`,
       bagBeepers: 0,
     },
     starterCode: `iniciar-programa
-  inicia-ejecucion
-    repetir 4 veces inicio
-      repetir 7 veces inicio
-        avanza;
-      fin;
-      gira-izquierda;
+  repetir 4 veces inicio
+    repetir 7 veces inicio
+      avanza;
     fin;
-    apagate;
-  termina-ejecucion
+    gira-izquierda;
+  fin;
 finalizar-programa`,
-    initialMessage: "¡Nivel 3! Tu objetivo es dar la vuelta completa por todo el borde del mundo hasta volver a (1,1). Utiliza la combinación de `repetir` para recorrer cada lado y aprovecha las decisiones o giros (`gira-izquierda;`) cada vez que llegues a una pared para continuar por el contorno.",
+    initialMessage: "¡Nivel 3! Tu objetivo es dar la vuelta completa por todo el borde del mundo hasta volver a (1,1). Utiliza la combinación de `repetir` para recorrer cada lado y añade `gira-izquierda;` al terminar cada lado para continuar por el contorno.",
   },
   {
     id: 4,
     title: "Nivel 4: Mochilas y Fichas",
-    subtitle: "Recolección perimetral de fichas",
-    objective: "Da la vuelta completa por el contorno del mapa y recoge todas las fichas que encuentres en el camino con 'coge-ficha'.",
+    subtitle: "Decisiones y recolección de fichas",
+    objective: "Da la vuelta completa por el contorno del mapa y recoge todas las fichas que encuentres en el camino usando 'si junto-a-ficha' y 'coge-ficha'.",
     gridPosition: 'bottom-right',
-    commands: ['coge-ficha;', 'junto-a-ficha'],
+    commands: ['avanza;', 'gira-izquierda;', 'repetir N veces', 'si junto-a-ficha entonces', 'coge-ficha;'],
+    quickCommands: ['avanza', 'gira-izquierda', 'repetir', 'si', 'coge-ficha'],
+    conditions: ['junto-a-ficha'],
     initialWorld: {
       karelPosition: { street: 1, avenue: 1 },
       karelDirection: 'ESTE',
@@ -90,18 +89,15 @@ finalizar-programa`,
       bagBeepers: 0,
     },
     starterCode: `iniciar-programa
-  inicia-ejecucion
-    repetir 4 veces inicio
-      repetir 7 veces inicio
-        si junto-a-ficha entonces inicio
-          coge-ficha;
-        fin;
-        avanza;
+  repetir 4 veces inicio
+    repetir 7 veces inicio
+      si junto-a-ficha entonces inicio
+        coge-ficha;
       fin;
-      gira-izquierda;
+      avanza;
     fin;
-    apagate;
-  termina-ejecucion
+    gira-izquierda;
+  fin;
 finalizar-programa`,
     initialMessage: "¡Nivel 4: Mochilas y Fichas! En este nivel, mientras recorres el contorno encontrarás fichas en el camino. Antes de avanzar en cada esquina, verifica con `si junto-a-ficha` para recoger la ficha con `coge-ficha;` y guardarla en tu mochila.",
   },
@@ -114,15 +110,18 @@ export const createKarelChallenge = (): KarelLevel => {
   const street = 1 + Math.floor(Math.random() * 8)
   const startAvenue = 1 + Math.floor(Math.random() * 4)
   const difficulty = 1 + Math.floor(Math.random() * 3)
-  const avenues = Array.from({ length: 9 - startAvenue }, (_, index) => startAvenue + index)
-  // Sample distinct corners so every generated map is reachable with the existing runner.
+  const cells = Array.from({ length: 64 }, (_, index) => ({
+    street: Math.floor(index / 8) + 1,
+    avenue: (index % 8) + 1,
+  }))
+  // Sample distinct cells across the whole map, rather than just ahead of Karel.
   const beepers = Array.from({ length: difficulty + 1 }, () => {
-    const index = Math.floor(Math.random() * avenues.length)
-    const avenue = avenues.splice(index, 1)[0] ?? startAvenue
-    return { street, avenue, count: difficulty === 3 ? 2 : 1 }
+    const index = Math.floor(Math.random() * cells.length)
+    const cell = cells.splice(index, 1)[0] ?? { street: 1, avenue: 1 }
+    return { ...cell, count: difficulty === 3 ? 2 : 1 }
   })
   const difficultyLabel = ['Inicial', 'Intermedia', 'Avanzada'][difficulty - 1] ?? 'Inicial'
-  const objective = `Recoge todas las fichas de la calle ${street}, llega a la avenida 8 y apaga a Karel. Empiezas en la avenida ${startAvenue}, mirando al este.`
+  const objective = `Recoge todas las fichas de la cuadrícula. Empiezas en la calle ${street}, avenida ${startAvenue}, mirando al este.`
 
   return {
     id: -Date.now(),
@@ -131,7 +130,9 @@ export const createKarelChallenge = (): KarelLevel => {
     subtitle: `Dificultad ${difficultyLabel.toLowerCase()}`,
     objective,
     gridPosition: 'bottom-right',
-    commands: ['avanza;', 'coge-ficha;', 'junto-a-ficha', 'frente-libre', 'mientras', 'apagate;'],
+    commands: ['avanza;', 'gira-izquierda;', 'coge-ficha;', 'deja-ficha;', 'repetir N veces', 'si', 'mientras', 'define-nueva-instruccion'],
+    quickCommands: ['avanza', 'gira-izquierda', 'coge-ficha', 'deja-ficha', 'repetir', 'si', 'mientras', 'define-nueva-instruccion'],
+    conditions: ['frente-libre', 'junto-a-ficha', 'orientado-al-norte'],
     initialWorld: {
       karelPosition: { street, avenue: startAvenue },
       karelDirection: 'ESTE',
@@ -139,11 +140,8 @@ export const createKarelChallenge = (): KarelLevel => {
       bagBeepers: 0,
     },
     starterCode: `iniciar-programa
-  inicia-ejecucion
-    avanza;
-    apagate;
-  termina-ejecucion
+  avanza;
 finalizar-programa`,
-    initialMessage: `Desafío de dificultad ${difficultyLabel.toLowerCase()}. ${objective} Observa cuántas fichas hay en cada esquina y usa decisiones o bucles para recogerlas antes de avanzar.`,
+    initialMessage: '',
   }
 }

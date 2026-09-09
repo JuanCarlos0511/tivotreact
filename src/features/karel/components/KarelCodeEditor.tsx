@@ -3,6 +3,8 @@ import {
   ArrowUp,
   BookOpen,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Code2,
   Lightbulb,
   Pause,
@@ -20,22 +22,30 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { ClipboardEvent, KeyboardEvent } from 'react';
-import type { CompileResult, KarelSpeedMultiplier } from '@features/karel/hooks/use-karel-runner';
+import type { KarelLevel } from '@shared/types';
+import type { CompileResult, ExecutionLoop, KarelSpeedMultiplier } from '@features/karel/hooks/use-karel-runner';
 import {
   COMMAND_TEMPLATES,
   describeCodeLines,
   getCustomCommands,
+  getQuickCommands,
   getInsertionIndex,
   getSiblingIndex,
   moveCodeBlock,
   removeCodeBlock,
 } from '../editor/code-lines';
 import type { CommandTemplate } from '../editor/code-lines';
+import { configureProgramLine, insertProgramLines } from '../editor/edit-program';
+import { CONDITION_OPTIONS, getConditionOptions, needsConfiguration, validateProcedureName } from '../editor/command-config';
 import { TUTORIAL_COPY } from '../editor/tutorial';
 import './KarelCodeEditor.css';
 
 interface KarelCodeEditorProps {
+  levelId: number;
+  quickCommands: KarelLevel['quickCommands'];
+  conditions: KarelLevel['conditions'];
   code: string;
+  activeLoops: ExecutionLoop[];
   activeLineNumber: number | null;
   compileResult: CompileResult | null;
   executionError: string | null;
@@ -49,7 +59,6 @@ interface KarelCodeEditorProps {
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-  onCompile: () => void;
   onRun: () => void;
   onReset: () => void;
   onPauseToggle: () => void;
@@ -62,31 +71,18 @@ interface KarelCodeEditorProps {
   onTutorialDismiss?: () => void;
 }
 
-type KarelTutorialFocus = 'code' | 'runner' | 'compile' | null;
+type KarelTutorialFocus = 'quickCommands' | 'code' | 'runner' | 'reset' | null;
 
 const COMMAND_GROUPS = ['Movimiento', 'Fichas', 'Control', 'Mis instrucciones'] as const;
 const SPEEDS: KarelSpeedMultiplier[] = [1, 1.5, 2, 0.5];
-const CONDITION_OPTIONS = [
-  {
-    value: 'frente-libre',
-    label: 'Frente libre',
-    description: 'El siguiente cruce no está fuera del mundo.',
-  },
-  {
-    value: 'junto-a-ficha',
-    label: 'Junto a ficha',
-    description: 'Hay al menos una ficha en la esquina actual.',
-  },
-  {
-    value: 'orientado-al-norte',
-    label: 'Orientado al norte',
-    description: 'Karel está mirando hacia el norte.',
-  },
-] as const;
 
 export function KarelCodeEditor({
+  levelId,
+  quickCommands,
+  conditions,
   code,
   activeLineNumber,
+  activeLoops,
   compileResult,
   executionError,
   isRunning,
@@ -99,7 +95,6 @@ export function KarelCodeEditor({
   onRedo,
   canUndo,
   canRedo,
-  onCompile,
   onRun,
   onReset,
   onPauseToggle,
@@ -113,6 +108,7 @@ export function KarelCodeEditor({
 }: KarelCodeEditorProps) {
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const [editingLine, setEditingLine] = useState<number | null>(null);
+  const [configuringLine, setConfiguringLine] = useState<number | null>(null);
   const [pendingCommand, setPendingCommand] = useState<CommandTemplate | null>(null);
   const [selectedCondition, setSelectedCondition] =
     useState<(typeof CONDITION_OPTIONS)[number]['value']>('frente-libre');
@@ -121,18 +117,24 @@ export function KarelCodeEditor({
   const programRef = useRef<HTMLOListElement>(null);
   const tutorialRef = useRef<HTMLElement>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
+  const commandLibraryRef = useRef<HTMLDivElement>(null);
   const focusRequestRef = useRef<number | null>(null);
+  const [canScrollCommandsBack, setCanScrollCommandsBack] = useState(false);
+  const [canScrollCommandsForward, setCanScrollCommandsForward] = useState(false);
   const lines = code.split('\n');
   const descriptions = describeCodeLines(code);
-  const commands = [...COMMAND_TEMPLATES, ...getCustomCommands(descriptions)];
+  const allCommands = [...COMMAND_TEMPLATES, ...getCustomCommands(descriptions)];
+  const commands = getQuickCommands(descriptions, quickCommands);
+  const conditionOptions = getConditionOptions(conditions, configuringLine === null ? undefined : descriptions[configuringLine]?.text);
   const selected = selectedLine === null ? undefined : descriptions[selectedLine];
   const selectedCommandId = selected?.text.split(/[\s;]/)[0]?.replace('-zumbador', '-ficha');
-  const selectedCommand = commands.find(
+  const selectedCommand = allCommands.find(
     (command) => selectedCommandId === command.id
   );
   const pendingCommandNeedsCondition = pendingCommand?.id === 'si' || pendingCommand?.id === 'mientras';
-  const repeatCountIsValid = Number.isFinite(repeatCount) && repeatCount >= 1;
-  const procedureNameIsValid = /^[a-zA-Z][\w-]*$/.test(procedureName.trim());
+  const repeatCountIsValid = Number.isSafeInteger(repeatCount) && repeatCount >= 1;
+  const procedureError = validateProcedureName(procedureName, code, configuringLine === null ? undefined : descriptions[configuringLine]?.text.match(/^define-nueva-instruccion\s+([\w-]+)/)?.[1]);
+  const procedureNameIsValid = !procedureError;
   const tutorialCopy = tutorialFocus ? TUTORIAL_COPY[tutorialFocus] : null;
   const insertionIndex =
     isMobile && selected && !selected.fixed && !selected.opensBlock
@@ -140,6 +142,23 @@ export function KarelCodeEditor({
       : getInsertionIndex(descriptions, selected ? selectedLine : null);
   const hasError = Boolean(executionError || (compileResult && !compileResult.success));
   const errorLine = executionError ? activeLineNumber : compileResult?.error?.line;
+  const isExecutionMode = isRunning || isPaused;
+  const isLevelFourCommandLibrary = levelId === 4;
+  const isQuickCommandsTutorial = tutorialFocus === 'quickCommands';
+
+  const updateCommandScrollState = () => {
+    const list = commandLibraryRef.current;
+    if (!list) return;
+    setCanScrollCommandsBack(list.scrollLeft > 1);
+    setCanScrollCommandsForward(list.scrollLeft + list.clientWidth < list.scrollWidth - 1);
+  };
+
+  const scrollQuickCommands = (direction: -1 | 1) => {
+    const list = commandLibraryRef.current;
+    if (!list) return;
+    list.scrollBy({ left: direction * Math.max(140, list.clientWidth * 0.65), behavior: 'smooth' });
+    window.setTimeout(updateCommandScrollState, 240);
+  };
 
   useEffect(() => {
     const lineIndex = activeLineNumber === null ? selectedLine : activeLineNumber - 1;
@@ -155,8 +174,18 @@ export function KarelCodeEditor({
   }, [activeLineNumber, selectedLine, code]);
 
   useEffect(() => {
+    if (!isMobile || !isLevelFourCommandLibrary) return;
+    const list = commandLibraryRef.current;
+    if (!list) return;
+    const observer = new ResizeObserver(updateCommandScrollState);
+    observer.observe(list);
+    updateCommandScrollState();
+    return () => observer.disconnect();
+  }, [isMobile, isLevelFourCommandLibrary, commands.length]);
+
+  useEffect(() => {
     const target =
-      tutorialFocus === 'runner' || tutorialFocus === 'compile'
+      tutorialFocus === 'runner' || tutorialFocus === 'reset'
         ? actionsRef.current
         : tutorialRef.current;
     target?.scrollIntoView({ block: 'nearest' });
@@ -208,34 +237,17 @@ export function KarelCodeEditor({
 
   const insertLines = (source: string[], index = insertionIndex, replaceSelection = true) => {
     if (isRunning) return;
-    const selectedDescription =
-      selectedLine === null ? undefined : descriptions[selectedLine];
-    const replacesSelection = Boolean(
-      replaceSelection && selectedDescription && !selectedDescription.fixed
-    );
-    const targetIndex = replacesSelection ? selectedLine ?? index : index;
-    const previous = descriptions[targetIndex - 1];
-    const depth = replacesSelection
-      ? selectedDescription?.depth ?? 2
-      : previous?.opensBlock
-        ? previous.depth + 1
-        : (descriptions[targetIndex]?.depth ?? 2);
-    const nextLines = [...lines];
-    const nextSource = source.map((line) => `${'  '.repeat(depth)}${line}`);
-    if (replacesSelection) {
-      const endIndex = selectedDescription?.end ?? targetIndex;
-      nextLines.splice(targetIndex, endIndex - targetIndex + 1, ...nextSource);
-    } else {
-      nextLines.splice(targetIndex, 0, ...nextSource);
-    }
-    onChange(nextLines.join('\n'));
-    focusLine(Math.min(targetIndex, nextLines.length - 1));
+    const result = insertProgramLines(code, source, selectedLine, { index, replaceSelection });
+    onChange(result.code);
+    focusLine(result.selected, false);
   };
 
   const insertCommand = (command: CommandTemplate) => {
-    if (['si', 'mientras', 'repetir', 'define-nueva-instruccion'].includes(command.id)) {
+    if (isRunning) return;
+    setConfiguringLine(null);
+    if (needsConfiguration(command)) {
       setPendingCommand(command);
-      if (command.id === 'si' || command.id === 'mientras') setSelectedCondition('frente-libre');
+      if (command.id === 'si' || command.id === 'mientras') setSelectedCondition(conditions[0] ?? 'frente-libre');
       if (command.id === 'repetir') setRepeatCount(2);
       if (command.id === 'define-nueva-instruccion') {
         let name = 'mi-instruccion';
@@ -246,6 +258,17 @@ export function KarelCodeEditor({
       return;
     }
     insertLines(command.source);
+  };
+
+  const editParameters = (index: number) => {
+    const line = descriptions[index];
+    const command = allCommands.find(entry => entry.id === line?.text.split(/\s/)[0]);
+    if (isRunning || !command || !needsConfiguration(command)) return;
+    setConfiguringLine(index);
+    setPendingCommand(command);
+    setSelectedCondition(CONDITION_OPTIONS.find(option => line?.text.includes(option.value))?.value ?? 'frente-libre');
+    setRepeatCount(Number(line?.text.match(/^repetir\s+(\d+)/)?.[1] ?? 2));
+    setProcedureName(line?.text.match(/^define-nueva-instruccion\s+([\w-]+)/)?.[1] ?? 'mi-instruccion');
   };
 
   const getConditionBodyLine = () => {
@@ -276,13 +299,17 @@ export function KarelCodeEditor({
     if (!pendingCommand) return;
     if (pendingCommand.id === 'repetir' && !repeatCountIsValid) return;
     if (pendingCommand.id === 'define-nueva-instruccion' && !procedureNameIsValid) return;
+    if (configuringLine !== null) {
+      onChange(configureProgramLine(code, configuringLine, getPendingCommandSource()[0]!));
+      setPendingCommand(null);
+      return;
+    }
     if (pendingCommand.id !== 'define-nueva-instruccion') {
       insertLines(getPendingCommandSource());
       setPendingCommand(null);
       return;
     }
-    const mainIndex = descriptions.findIndex((line) => line.text === 'inicia-ejecucion');
-    insertLines(getPendingCommandSource(), Math.max(1, mainIndex), false);
+    insertLines(getPendingCommandSource(), 1, false);
     setPendingCommand(null);
   };
 
@@ -338,29 +365,63 @@ export function KarelCodeEditor({
 
   return (
     <section
-      className={`karel-editor-panel structured-editor ${tutorialFocus ? `karel-editor-panel-tutorial karel-editor-panel-tutorial-${tutorialFocus}` : ''}`}
+      className={`karel-editor-panel structured-editor ${isExecutionMode ? 'execution-active' : ''} ${tutorialFocus ? `karel-editor-panel-tutorial karel-editor-panel-tutorial-${tutorialFocus}` : ''}`}
       aria-label="Editor de código Karel"
     >
       <div className="karel-editor-toolbar">
         <span className="karel-editor-title">
           <Terminal size={17} /> Código Karel Pascal
         </span>
-        <button className="editor-reset-button" type="button" onClick={resetProgram}>
-          <RotateCcw size={14} /> Reiniciar
-        </button>
+        <div className="karel-editor-toolbar-actions">
+          <button
+            className="editor-help-button"
+            type="button"
+            onClick={onHelp}
+            aria-haspopup="dialog"
+          >
+            <Lightbulb size={14} /> Objetivos y tutorial
+          </button>
+        </div>
       </div>
 
       <div
         className={`code-editor-columns ${tutorialFocus === 'code' ? 'tutorial-target-spotlight' : ''}`}
       >
-        <section className="command-library" aria-labelledby="command-library-title">
+        <section
+          className={`command-library ${isLevelFourCommandLibrary ? 'command-library-level-4' : ''}`}
+          aria-labelledby="command-library-title"
+        >
           <header className="editor-column-heading">
             <Plus size={16} />
-            <h2 id="command-library-title">Comandos</h2>
+            <h2 id="command-library-title">Comandos rápidos</h2>
+            {isMobile && isLevelFourCommandLibrary && (
+              <div className="quick-command-carousel-actions" aria-label="Navegar comandos rápidos">
+                <button
+                  className={`quick-command-carousel-button ${isQuickCommandsTutorial ? 'tutorial-target-spotlight' : ''}`}
+                  type="button"
+                  onClick={() => scrollQuickCommands(-1)}
+                  disabled={!canScrollCommandsBack}
+                  aria-label="Ver comandos anteriores"
+                  title="Ver comandos anteriores"
+                >
+                  <ChevronLeft size={15} />
+                </button>
+                <button
+                  className={`quick-command-carousel-button ${isQuickCommandsTutorial ? 'tutorial-target-spotlight' : ''}`}
+                  type="button"
+                  onClick={() => scrollQuickCommands(1)}
+                  disabled={!canScrollCommandsForward}
+                  aria-label="Ver más comandos"
+                  title="Ver más comandos"
+                >
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+            )}
           </header>
           <p className="editor-column-caption">Pulsa para añadir al programa.</p>
-          <div className="command-library-list">
-            {COMMAND_GROUPS.map((group) => (
+          <div className="command-library-list" ref={commandLibraryRef} onScroll={updateCommandScrollState}>
+            {COMMAND_GROUPS.filter(group => commands.some(command => command.group === group)).map((group) => (
               <div className="command-category" key={group}>
                 <h3>{group}</h3>
                 {commands
@@ -456,14 +517,11 @@ export function KarelCodeEditor({
               >
                 <Trash2 size={16} />
               </button>
-              <button
-                type="button"
-                aria-label="Editar línea seleccionada"
-                disabled={isRunning || !selected || selected.fixed}
-                onClick={() => selectedLine !== null && focusLine(selectedLine, true)}
-              >
+              {selectedCommand && needsConfiguration(selectedCommand) && <button
+                type="button" aria-label="Editar parámetros" disabled={isRunning}
+                onClick={() => selectedLine !== null && editParameters(selectedLine)}>
                 <Pencil size={16} />
-              </button>
+              </button>}
             </div>
           )}
           <p className="editor-column-caption" id="line-program-hint">
@@ -476,11 +534,13 @@ export function KarelCodeEditor({
           <ol className="code-line-list" ref={programRef} aria-describedby="line-program-hint">
             {descriptions.map((line, index) => {
               const active = activeLineNumber === index + 1;
+              const inLoop = activeLoops.some(loop => index + 1 >= loop.lineNumber && index + 1 <= loop.endLineNumber);
+              const lineLoops = activeLoops.filter(loop => loop.lineNumber === index + 1);
               const invalid = hasError && errorLine === index + 1;
               return (
                 <li
                   key={index}
-                  className={`code-line-block ${line.fixed ? 'code-line-fixed' : ''} ${selectedLine === index ? 'selected' : ''} ${active ? 'active' : ''} ${invalid ? 'invalid' : ''}`}
+                  className={`code-line-block ${line.fixed ? 'code-line-fixed' : ''} ${inLoop ? 'in-loop' : ''} ${line.opensBlock ? 'block-header' : ''} ${selectedLine === index ? 'selected' : ''} ${active ? 'active' : ''} ${invalid ? 'invalid' : ''}`}
                   aria-current={active ? 'step' : undefined}
                   tabIndex={-1}
                   onClick={isMobile ? () => selectLine(index) : undefined}
@@ -489,11 +549,13 @@ export function KarelCodeEditor({
                     {index + 1}
                     {active && <Play size={8} />}
                   </span>
+                  <span className="code-indent-guides" aria-hidden="true">{Array.from({ length: line.depth }, (_, guide) =>
+                    <i key={guide} style={{ left: `${guide * 14 + 4}px` }} />)}</span>
                   <input
                     data-line-input={index}
                     className="code-line-input"
                     style={{
-                      paddingInlineStart: `${Math.min(line.depth, isMobile ? 3 : 5) * (isMobile ? 3 : 10) + 4}px`,
+                      paddingInlineStart: `${line.depth * 14 + 4}px`,
                     }}
                     aria-label={`Línea ${index + 1}${line.fixed ? ', estructura del programa' : ''}`}
                     aria-invalid={invalid}
@@ -507,7 +569,8 @@ export function KarelCodeEditor({
                     onFocus={() => selectLine(index)}
                     onBlur={() => setEditingLine(null)}
                     onDoubleClick={() => {
-                      if (isMobile && !line.fixed && !isRunning) focusLine(index, true);
+                      if (line.opensBlock) editParameters(index);
+                      else if (isMobile && !line.fixed && !isRunning) focusLine(index, true);
                     }}
                     onChange={(event) => updateLine(index, event.target.value)}
                     onKeyDown={(event) => {
@@ -517,8 +580,15 @@ export function KarelCodeEditor({
                       if (!line.fixed) handlePaste(event, index);
                     }}
                   />
-                  {!line.fixed && !isMobile && (
-                    <div className="code-line-actions">
+                  <div className="code-line-end">
+                    {lineLoops.map((loop, loopIndex) => (
+                      <span className="loop-progress" key={`${loop.lineNumber}-${loopIndex}`} aria-label={`Iteración ${loop.iteration} de ${loop.total ?? 'sin límite definido'}`}>
+                        {loop.iteration}/{loop.total ?? '∞'}
+                      </span>
+                    ))}
+                    {!line.fixed && !isMobile && (
+                      <div className="code-line-actions">
+                      {line.opensBlock && <button type="button" aria-label={`Editar parámetros de línea ${index + 1}`} disabled={isRunning} onClick={() => editParameters(index)}><Pencil size={13} /></button>}
                       <button
                         type="button"
                         aria-label={`Subir línea ${index + 1}`}
@@ -546,8 +616,9 @@ export function KarelCodeEditor({
                       >
                         <Trash2 size={13} />
                       </button>
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </li>
               );
             })}
@@ -597,7 +668,7 @@ export function KarelCodeEditor({
         </aside>
       </div>
 
-      {(compileResult || executionError) && (
+      {hasError && (
         <div
           id="karel-compile-result"
           role={hasError ? 'alert' : 'status'}
@@ -605,7 +676,7 @@ export function KarelCodeEditor({
         >
           {hasError
             ? `Error${errorLine ? ` en línea ${errorLine}` : ''}: ${executionError ?? compileResult?.error?.message ?? 'No se pudo ejecutar el programa.'}`
-            : `✓ Compilación exitosa. ${compileResult?.warning ?? 'Código listo para ejecutar.'}`}
+            : isRunning ? 'Programa en ejecución.' : isPaused ? 'Programa en pausa.' : 'Código válido.'}
         </div>
       )}
 
@@ -621,11 +692,13 @@ export function KarelCodeEditor({
             <button className="tutorial-skip-button" type="button" onClick={onTutorialDismiss}>
               Omitir
             </button>
-            <button className="tutorial-skip-button" type="button" onClick={onTutorialPrevious}>
-              Anterior
-            </button>
+            {tutorialFocus !== 'quickCommands' && (
+              <button className="tutorial-skip-button" type="button" onClick={onTutorialPrevious}>
+                Anterior
+              </button>
+            )}
             <button className="tutorial-next-button" type="button" onClick={onTutorialNext}>
-              {tutorialFocus === 'compile' ? 'Finalizar' : 'Siguiente'}
+              {tutorialFocus === 'reset' || tutorialFocus === 'quickCommands' ? 'Finalizar' : 'Siguiente'}
             </button>
           </div>
         </aside>
@@ -637,11 +710,10 @@ export function KarelCodeEditor({
             <button
               className="mobile-dock-compile"
               type="button"
-              onClick={onCompile}
-              disabled={isRunning}
+              onClick={resetProgram}
             >
-              <Terminal size={16} />
-              <span>Compilar</span>
+              <RotateCcw size={16} />
+              <span>Reiniciar</span>
             </button>
             <button
               className="mobile-dock-play"
@@ -665,7 +737,7 @@ export function KarelCodeEditor({
               <StepBack size={16} />
             </button>
             <button
-              className="mobile-dock-pause"
+              className={`mobile-dock-pause ${isRunning ? 'is-ready-to-pause' : ''} ${isPaused ? 'is-paused' : ''}`}
               type="button"
               onClick={onPauseToggle}
               disabled={!isRunning && !isPaused}
@@ -696,16 +768,6 @@ export function KarelCodeEditor({
               <span className="speed-button-value">×{speedMultiplier}</span>
             </button>
           </div>
-          <div className="mobile-dock-utility">
-            <button type="button" onClick={resetProgram}>
-              <RotateCcw size={16} />
-              <span>Reiniciar</span>
-            </button>
-            <button type="button" onClick={onHelp} aria-haspopup="dialog">
-              <Lightbulb size={16} />
-              <span>Ayuda</span>
-            </button>
-          </div>
         </div>
       ) : (
         <div
@@ -714,16 +776,15 @@ export function KarelCodeEditor({
         >
           <div className="editor-primary-actions">
             <button
-              className={`editor-secondary-button ${tutorialFocus === 'compile' ? 'tutorial-target-spotlight' : ''}`}
+              className={`editor-secondary-button ${tutorialFocus === 'reset' ? 'tutorial-target-spotlight' : ''}`}
               type="button"
-              onClick={onCompile}
-              disabled={isRunning}
+              onClick={resetProgram}
             >
-              <Terminal size={15} />
-              Compilar
+              <RotateCcw size={15} />
+              Reiniciar
             </button>
             <button
-              className={`editor-run-button ${tutorialFocus === 'compile' ? 'tutorial-target-spotlight' : ''}`}
+              className={`editor-run-button ${tutorialFocus === 'reset' ? 'tutorial-target-spotlight' : ''}`}
               type="button"
               onClick={onRun}
               disabled={isRunning}
@@ -748,7 +809,7 @@ export function KarelCodeEditor({
               <StepBack size={16} />
             </button>
             <button
-              className="runner-icon-button runner-pause-button"
+              className={`runner-icon-button runner-pause-button ${isRunning ? 'is-ready-to-pause' : ''} ${isPaused ? 'is-paused' : ''}`}
               type="button"
               onClick={onPauseToggle}
               disabled={!isRunning && !isPaused}
@@ -812,7 +873,7 @@ export function KarelCodeEditor({
 
             {pendingCommandNeedsCondition && (
               <div className="condition-option-grid" role="radiogroup" aria-label="Condición">
-                {CONDITION_OPTIONS.map((condition) => (
+                {conditionOptions.map((condition) => (
                   <button
                     className={`condition-option-button ${selectedCondition === condition.value ? 'selected' : ''}`}
                     type="button"
@@ -835,7 +896,6 @@ export function KarelCodeEditor({
                 <input
                   type="number"
                   min={1}
-                  max={64}
                   value={repeatCount}
                   onChange={(event) => setRepeatCount(Number(event.target.value))}
                 />
@@ -854,8 +914,10 @@ export function KarelCodeEditor({
               </label>
             )}
 
+            {pendingCommand.id === 'define-nueva-instruccion' && procedureError && <p role="alert">{procedureError}</p>}
+            {pendingCommand.id === 'repetir' && !repeatCountIsValid && <p role="alert">Escribe un número entero mayor que cero.</p>}
             <pre className="control-command-preview">
-              <code>{getPendingCommandSource().join('\n')}</code>
+              <code>{(configuringLine === null ? getPendingCommandSource() : getPendingCommandSource().slice(0, 1)).join('\n')}</code>
             </pre>
 
             <div className="control-command-actions">
@@ -872,7 +934,7 @@ export function KarelCodeEditor({
                 }
               >
                 <Check size={15} />
-                Insertar
+                {configuringLine === null ? 'Insertar' : 'Guardar'}
               </button>
             </div>
           </section>

@@ -40,7 +40,7 @@ const createLevelSessionId = (levelId: number) => `karel-level-${levelId}`
 const createInitialLevelMessage = (level: KarelLevel): TivotAssistantChatMessage =>
   createAssistantMessage(
     createStandardTextPayload(
-      `Objetivo del mapa: ${level.objective}\n\n${level.initialMessage}`,
+      `Objetivo del mapa: ${level.objective}${level.mode === 'challenge' || !level.initialMessage ? '' : `\n\n${level.initialMessage}`}`,
       {
         is_evaluation: false,
         passed: null,
