@@ -4,11 +4,11 @@ import { getTutorialStepsForLevel, TUTORIAL_COPY, type TutorialStep } from '../f
 import { ResponsiveDialog } from './ResponsiveDialog'
 import { ActionButton, IconButton, colors } from './ui'
 
-export function GameHelpDialog({ visible, portrait, objective, step, onClose, onNext, onPrevious, onRestart }: {
-  visible: boolean; portrait: boolean; objective: string; step: TutorialStep | null
+export function GameHelpDialog({ visible, portrait, levelId, objective, step, onClose, onNext, onPrevious, onRestart }: {
+  visible: boolean; portrait: boolean; levelId: number; objective: string; step: TutorialStep | null
   onClose: () => void; onNext: () => void; onPrevious: () => void; onRestart: () => void
 }) {
-  const tutorialSteps = getTutorialStepsForLevel(1)
+  const tutorialSteps = getTutorialStepsForLevel(levelId)
   return (
     <ResponsiveDialog visible={visible} onClose={onClose} label="Ayuda de Karel"
       placement={portrait ? 'bottom' : 'center'} style={styles.dialog}>
@@ -20,7 +20,7 @@ export function GameHelpDialog({ visible, portrait, objective, step, onClose, on
         {step && <Text style={styles.progress}>Paso {tutorialSteps.indexOf(step) + 1} de {tutorialSteps.length}</Text>}
         {(!step || step === 'chat') && <Text style={styles.objective}>{objective}</Text>}
         <Text style={styles.body}>{step ? TUTORIAL_COPY[step].body
-          : 'Selecciona una línea y pulsa un comando para reemplazarla. Usa las flechas para ordenar tu programa y la papelera para borrar. Ejecutar comprueba el código y corre las instrucciones en ese mismo orden.'}</Text>
+          : 'Selecciona una línea y pulsa un comando para insertarlo. Usa las flechas para ordenar tu programa y la papelera para borrar. Ejecutar comprueba el código y corre las instrucciones en ese mismo orden.'}</Text>
       </ScrollView>
       <View style={styles.actions}>
         <ActionButton label={step ? 'Omitir' : 'Ver tutorial'} onPress={step ? onClose : onRestart} />

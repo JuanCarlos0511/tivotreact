@@ -42,7 +42,8 @@ export function ChatPanel({
         </View>
       </View>
       <ScrollView ref={scrollRef} style={styles.messages} contentContainerStyle={styles.messagesContent}
-        keyboardShouldPersistTaps="handled" onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
+        keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled"
+        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}>
         {session?.messages.map(message => (
           <ChatMessage key={message.id} message={message} isLatestAssistantMessage={message.id === latestAssistantId}
             isLoading={isResponding} onSelectQuickReply={option => void onSelectQuickReply(option)}

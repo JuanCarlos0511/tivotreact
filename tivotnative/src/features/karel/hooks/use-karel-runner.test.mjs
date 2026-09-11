@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import React from 'react';
 import { act, create } from 'react-test-renderer';
-import { useKarelRunner } from './use-karel-runner.ts';
+import { buildExecution, useKarelRunner } from './use-karel-runner.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const initialWorld = { karelPosition: { street: 1, avenue: 1 }, karelDirection: 'ESTE', beepers: [], bagBeepers: 0 };
@@ -64,4 +64,64 @@ test('invalid runs clear old playback, and rewind clears a collision', t => {
   act(() => t.mock.timers.tick(1200));
   assert.equal(runner.worldState.karelPosition.avenue, 1);
   act(() => view.unmount());
+});
+
+test('level 4 completes its long playback without exceeding React update depth', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const levelFourWorld = {
+    karelPosition: { street: 1, avenue: 1 },
+    karelDirection: 'ESTE',
+    beepers: [
+      { street: 1, avenue: 4, count: 1 },
+      { street: 5, avenue: 8, count: 1 },
+      { street: 8, avenue: 3, count: 1 },
+      { street: 4, avenue: 1, count: 1 },
+    ],
+    bagBeepers: 0,
+  };
+  const levelFourCode = `iniciar-programa
+  repetir 4 veces inicio
+    repetir 7 veces inicio
+      si junto-a-ficha entonces inicio
+        coge-ficha;
+      fin;
+      avanza;
+    fin;
+    gira-izquierda;
+  fin;
+finalizar-programa`;
+  let runner;
+  function Harness() { runner = useKarelRunner(levelFourWorld); return null; }
+  let view;
+  act(() => { view = create(React.createElement(Harness)); });
+  act(() => runner.runCode(levelFourCode));
+
+  for (let step = 0; step < 200 && runner.isRunning; step += 1) {
+    act(() => t.mock.timers.tick(600));
+  }
+
+  assert.equal(runner.isRunning, false);
+  assert.equal(runner.executionError, null);
+  assert.equal(runner.currentStepIndex, runner.steps.length - 1);
+  assert.deepEqual(runner.worldState.karelPosition, { street: 1, avenue: 1 });
+  assert.equal(runner.worldState.karelDirection, 'ESTE');
+  assert.equal(runner.worldState.bagBeepers, 4);
+  assert.deepEqual(runner.worldState.beepers, []);
+  act(() => view.unmount());
+});
+
+test('leaving a ficha never stacks a second ficha in the same cell', () => {
+  const occupiedWorld = {
+    karelPosition: { street: 1, avenue: 1 },
+    karelDirection: 'ESTE',
+    beepers: [{ street: 1, avenue: 1, count: 1 }],
+    bagBeepers: 1,
+  };
+  const result = buildExecution('iniciar-programa\n  deja-ficha;\nfinalizar-programa', occupiedWorld);
+  const finalStep = result.steps.at(-1);
+
+  assert.equal(result.result.success, true);
+  assert.match(result.steps[1].error, /Ya hay una ficha/);
+  assert.deepEqual(finalStep.worldSnapshot.beepers, [{ street: 1, avenue: 1, count: 1 }]);
+  assert.equal(finalStep.worldSnapshot.bagBeepers, 1);
 });

@@ -8,8 +8,8 @@ export function ResponsiveDialog({ visible, onClose, children, style, placement 
   placement?: 'center' | 'right' | 'bottom'; label: string
 }) {
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}
-      supportedOrientations={['portrait', 'portrait-upside-down', 'landscape-left', 'landscape-right']}>
+    <Modal visible={visible} transparent animationType={placement === 'bottom' ? 'slide' : 'fade'} onRequestClose={onClose}
+      supportedOrientations={['portrait']}>
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <Pressable accessibilityLabel="Cerrar ventana" onPress={onClose} style={StyleSheet.absoluteFill} />

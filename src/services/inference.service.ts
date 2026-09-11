@@ -14,9 +14,9 @@ import type {
 } from '@shared/types'
 import { KAREL_SYSTEM_PROMPT, buildConversationPrompt, buildKarelLevelContext } from '@shared/prompts'
 import { createStandardTextPayload, isInteractiveFlowProblem } from '@shared/types'
-import { env } from '@config/env'
 import { createAiProvider } from './ai'
 import { parseAssistantPayload } from './parser.service'
+import { createCompleteLevelSolution } from './direct-level-solution'
 import {
   createSafeKarelCodeExample,
   explicitlyRequestsCode,
@@ -185,7 +185,6 @@ const completeWithFallback = async (
   requestedCodeFallback: TivotAssistantPayload | null = null,
 ): Promise<InferenceResult> => {
   try {
-    console.warn('[Tivot Inference] Proveedor activo:', env.VITE_AI_PROVIDER)
     const provider = createAiProvider()
     const rawAnswer = await provider.complete(prompt, messages)
     const payload = parseAssistantPayload(rawAnswer)
@@ -242,10 +241,14 @@ const createRequestedCodePayload = (
   query: string,
   activeLevel: KarelLevel | null,
 ): TivotAssistantPayload => {
-  const suggestedCode = createSafeKarelCodeExample(query, activeLevel?.quickCommands)
-  const message = requestsContourCodeExample(query) && suggestedCode.length > 3
-    ? 'Preparé un ejemplo para recorrer el contorno. Pruébalo y observa qué zonas quedan sin visitar; todavía tendrás que decidir cómo llegar a las fichas del interior.'
-    : 'Preparé un ejemplo corto y válido. Pulsa Probar código y después Ejecutar para observar qué hace Tivot.'
+  const suggestedCode = activeLevel
+    ? createCompleteLevelSolution(activeLevel)
+    : createSafeKarelCodeExample(query)
+  const message = activeLevel
+    ? 'Aquí tienes la solución completa del nivel. Pulsa Probar código y después Ejecutar para verla funcionar.'
+    : requestsContourCodeExample(query) && suggestedCode.length > 3
+      ? 'Preparé un programa completo para recorrer el contorno. Pulsa Probar código y después Ejecutar.'
+      : 'Preparé un programa válido. Pulsa Probar código y después Ejecutar para observar qué hace Tivot.'
 
   return createStandardTextPayload(
     message,

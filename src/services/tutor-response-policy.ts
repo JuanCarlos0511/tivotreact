@@ -16,7 +16,10 @@ export const explicitlyRequestsCode = (text: string): boolean => {
   return (
     /\b(dame|ponme|muestrame|escribe|genera|quiero|quisiera|necesito)\b[^.?!]{0,100}\b(codigo|ejemplo|programa)\b/.test(normalized) ||
     /\b(probar|aplicar|cargar)\b[^.?!]{0,40}\bcodigo\b/.test(normalized) ||
-    /\bcodigo\b[^.?!]{0,40}\b(probar|aplicar|cargar)\b/.test(normalized)
+    /\bcodigo\b[^.?!]{0,40}\b(probar|aplicar|cargar)\b/.test(normalized) ||
+    /\b(dame|muestrame|escribe|genera|quiero|quisiera|necesito)\b[^.?!]{0,100}\b(solucion|respuesta)\b/.test(normalized) ||
+    /\b(solucion|respuesta)\s+(directa|completa)\b/.test(normalized) ||
+    /\b(resuelve|soluciona)(lo|me)?\b/.test(normalized)
   )
 }
 
@@ -92,9 +95,9 @@ export const isApplicableKarelProgram = (suggestedCode: string[] | null): boolea
 }
 
 export const TUTOR_CODE_CORRECTION_REQUEST = [
-  'El estudiante pidió explícitamente un ejemplo de código aplicable.',
+  'El estudiante pidió explícitamente el código o la solución directa y completa.',
   'Tu respuesta anterior no incluyó líneas para el botón Probar código.',
   'Corrígela ahora: devuelve únicamente JSON válido con sugiereCodigo=true y codigoSugerido como una lista no vacía.',
-  'Incluye un programa Karel completo y válido para el nivel actual, desde iniciar-programa hasta finalizar-programa.',
+  'Incluye un programa Karel completo y válido que cumpla todo el objetivo del nivel actual, desde iniciar-programa hasta finalizar-programa; no entregues una pista ni una solución parcial.',
   'No digas que debe guardar, copiar o pegar: la interfaz lo cargará automáticamente.',
 ].join(' ')

@@ -163,8 +163,7 @@ const applyCommand = (command: BasicCommand, world: KarelWorldState): { world: K
     )
     const nextBeepers = [...nextWorld.beepers]
     if (beeperIndex >= 0) {
-      const currentBeeper = nextBeepers[beeperIndex]
-      if (currentBeeper) nextBeepers[beeperIndex] = { ...currentBeeper, count: currentBeeper.count + 1 }
+      return { world, error: 'Ya hay una ficha en esta casilla' }
     } else {
       nextBeepers.push({ ...nextWorld.karelPosition, count: 1 })
     }
@@ -494,6 +493,9 @@ export const useKarelRunner = (initialWorld: KarelWorldState) => {
   }
 
   const playFrom = (stepIndex: number) => {
+    // The timeout that entered this step has already fired. Playback state is
+    // changed only when starting/resuming, not once per rendered step.
+    timeoutRef.current = null
     const step = stepsRef.current[stepIndex]
     if (!step) {
       setIsRunning(false)
@@ -502,8 +504,6 @@ export const useKarelRunner = (initialWorld: KarelWorldState) => {
       return
     }
 
-    setIsRunning(true)
-    setIsPaused(false)
     setCurrentStep(stepIndex)
     if (step.error) {
       setIsRunning(false)
@@ -521,6 +521,8 @@ export const useKarelRunner = (initialWorld: KarelWorldState) => {
     setWorldState(cloneWorld(initialWorld))
     setActiveLineNumber(null)
     setExecutionError(null)
+    setIsRunning(true)
+    setIsPaused(false)
     playFrom(0)
   }
 
@@ -534,6 +536,8 @@ export const useKarelRunner = (initialWorld: KarelWorldState) => {
   const resumeExecution = () => {
     if (!isPaused) return
     clearPendingTimeout()
+    setIsRunning(true)
+    setIsPaused(false)
     playFrom(currentStepIndexRef.current + 1)
   }
 

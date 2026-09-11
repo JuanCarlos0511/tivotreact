@@ -13,6 +13,8 @@ test('native detects requests for code and rejects incomplete tutor responses', 
     message: 'Pulsa Probar código.', suggestsCode: false, suggestedCode: null,
   }, true), true)
   assert.equal(explicitlyRequestsCode('¿Puedo probar un código para moverme por el contorno?'), true)
+  assert.equal(explicitlyRequestsCode('Dame la solución directa de este nivel'), true)
+  assert.equal(explicitlyRequestsCode('Resuélvelo completo por favor'), true)
 })
 
 test('native builds the same valid fallback for a contour request', () => {

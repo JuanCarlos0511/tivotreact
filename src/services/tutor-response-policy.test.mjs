@@ -12,6 +12,8 @@ test('detects explicit Spanish requests for code', () => {
   assert.equal(explicitlyRequestsCode('Ya intenté y me choqué, ponme el ejemplo'), true)
   assert.equal(explicitlyRequestsCode('¿Qué debería observar en la siguiente casilla?'), false)
   assert.equal(explicitlyRequestsCode('¿Puedo probar un código para moverme por el contorno?'), true)
+  assert.equal(explicitlyRequestsCode('Dame la solución directa de este nivel'), true)
+  assert.equal(explicitlyRequestsCode('Resuélvelo completo por favor'), true)
 })
 
 test('rejects responses that promise Probar código without applicable lines', () => {

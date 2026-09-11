@@ -246,6 +246,13 @@ export type KarelCommandId = 'avanza' | 'gira-izquierda' | 'coge-ficha' | 'deja-
   | 'repetir' | 'si' | 'mientras' | 'define-nueva-instruccion'
 export type KarelCondition = 'frente-libre' | 'junto-a-ficha' | 'orientado-al-norte'
 
+export interface KarelLevelGoal {
+  position: KarelWorldPoint
+  direction?: KarelDirection
+  requireAllBeepers?: boolean
+  requiredVisits?: readonly KarelWorldPoint[]
+}
+
 export interface KarelLevel {
   id: number
   mode?: 'challenge'
@@ -257,7 +264,17 @@ export interface KarelLevel {
   // The toolbox may offer a complete block instead of its individual body commands.
   quickCommands: readonly KarelCommandId[]
   conditions: readonly KarelCondition[]
+  goal: KarelLevelGoal
   initialWorld: KarelWorldState
   starterCode: string
   initialMessage: string
+  savedGameId?: string
+  savedGameName?: string
+}
+
+export interface SavedChallengeGame {
+  id: string
+  name: string
+  savedAt: string
+  level: KarelLevel
 }

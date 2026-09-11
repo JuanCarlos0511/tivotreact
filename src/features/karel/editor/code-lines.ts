@@ -47,7 +47,8 @@ export const getInsertionIndex = (lines: CodeLine[], selected: number | null): n
   const line = selected === null ? undefined : lines[selected];
   if (line) {
     if (line.text === 'iniciar-programa') return 1;
-    if (line.text === 'finalizar-programa' || line.text === 'fin;') return selected ?? 0;
+    if (line.text === 'finalizar-programa') return selected ?? 0;
+    if (line.text === 'fin;') return (selected ?? 0) + 1;
     return (selected ?? 0) + 1;
   }
   const endIndex = lines.findIndex(entry => entry.text === 'finalizar-programa');

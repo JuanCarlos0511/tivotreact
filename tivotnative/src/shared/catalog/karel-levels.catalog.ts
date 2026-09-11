@@ -10,6 +10,7 @@ export const KAREL_LEVELS: KarelLevel[] = [
     commands: ['avanza;'],
     quickCommands: ['avanza'],
     conditions: [],
+    goal: { position: { street: 1, avenue: 8 } },
     initialWorld: {
       karelPosition: { street: 1, avenue: 1 },
       karelDirection: 'ESTE',
@@ -30,6 +31,7 @@ finalizar-programa`,
     commands: ['repetir N veces', 'avanza;'],
     quickCommands: ['repetir', 'avanza'],
     conditions: [],
+    goal: { position: { street: 1, avenue: 8 } },
     initialWorld: {
       karelPosition: { street: 1, avenue: 1 },
       karelDirection: 'ESTE',
@@ -52,6 +54,15 @@ finalizar-programa`,
     commands: ['avanza;', 'gira-izquierda;', 'repetir N veces'],
     quickCommands: ['avanza', 'gira-izquierda', 'repetir'],
     conditions: [],
+    goal: {
+      position: { street: 1, avenue: 1 },
+      direction: 'ESTE',
+      requiredVisits: [
+        { street: 1, avenue: 8 },
+        { street: 8, avenue: 8 },
+        { street: 8, avenue: 1 },
+      ],
+    },
     initialWorld: {
       karelPosition: { street: 1, avenue: 1 },
       karelDirection: 'ESTE',
@@ -77,6 +88,16 @@ finalizar-programa`,
     commands: ['avanza;', 'gira-izquierda;', 'repetir N veces', 'si junto-a-ficha entonces', 'coge-ficha;'],
     quickCommands: ['avanza', 'gira-izquierda', 'repetir', 'si', 'coge-ficha'],
     conditions: ['junto-a-ficha'],
+    goal: {
+      position: { street: 1, avenue: 1 },
+      direction: 'ESTE',
+      requireAllBeepers: true,
+      requiredVisits: [
+        { street: 1, avenue: 8 },
+        { street: 8, avenue: 8 },
+        { street: 8, avenue: 1 },
+      ],
+    },
     initialWorld: {
       karelPosition: { street: 1, avenue: 1 },
       karelDirection: 'ESTE',
@@ -118,10 +139,11 @@ export const createKarelChallenge = (): KarelLevel => {
   const beepers = Array.from({ length: difficulty + 1 }, () => {
     const index = Math.floor(Math.random() * cells.length)
     const cell = cells.splice(index, 1)[0] ?? { street: 1, avenue: 1 }
-    return { ...cell, count: difficulty === 3 ? 2 : 1 }
+    return { ...cell, count: 1 }
   })
   const difficultyLabel = ['Inicial', 'Intermedia', 'Avanzada'][difficulty - 1] ?? 'Inicial'
-  const objective = `Recoge todas las fichas de la cuadrícula. Empiezas en la calle ${street}, avenida ${startAvenue}, mirando al este.`
+  const goal = { street, avenue: startAvenue }
+  const objective = `Recoge todas las fichas de la cuadrícula y regresa a la meta en la calle ${goal.street}, avenida ${goal.avenue}. Empiezas mirando al este.`
 
   return {
     id: -Date.now(),
@@ -130,9 +152,10 @@ export const createKarelChallenge = (): KarelLevel => {
     subtitle: `Dificultad ${difficultyLabel.toLowerCase()}`,
     objective,
     gridPosition: 'bottom-right',
-    commands: ['avanza;', 'gira-izquierda;', 'coge-ficha;', 'deja-ficha;', 'repetir N veces', 'si', 'mientras', 'define-nueva-instruccion'],
-    quickCommands: ['avanza', 'gira-izquierda', 'coge-ficha', 'deja-ficha', 'repetir', 'si', 'mientras', 'define-nueva-instruccion'],
-    conditions: ['frente-libre', 'junto-a-ficha', 'orientado-al-norte'],
+    commands: ['avanza;', 'gira-izquierda;', 'repetir N veces', 'si junto-a-ficha entonces', 'coge-ficha;'],
+    quickCommands: ['avanza', 'gira-izquierda', 'repetir', 'si', 'coge-ficha'],
+    conditions: ['junto-a-ficha'],
+    goal: { position: goal, requireAllBeepers: true },
     initialWorld: {
       karelPosition: { street, avenue: startAvenue },
       karelDirection: 'ESTE',

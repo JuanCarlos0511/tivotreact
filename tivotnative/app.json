@@ -3,26 +3,40 @@
     "name": "Tivot Native",
     "slug": "tivotnative",
     "version": "1.0.0",
-    "orientation": "default",
+    "jsEngine": "hermes",
+    "orientation": "portrait",
     "supportsTablet": true,
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "requireFullScreen": false
+      "requireFullScreen": true
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.givoid.tivotnative"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "orientation": "portrait-primary"
     },
     "plugins": [
-      "expo-image"
-    ]
+      "expo-image",
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "PORTRAIT_UP"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4e13890c-cd48-46f5-a543-ebb18c490628"
+      }
+    }
   }
 }

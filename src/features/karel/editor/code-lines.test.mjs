@@ -9,6 +9,7 @@ for (const root of ['../../..', '../../../../tivotnative/src']) {
   const { KAREL_LEVELS, createKarelChallenge } = await import(new URL('shared/catalog/karel-levels.catalog.ts', base));
   const { getInitialTutorialStepForLevel } = await import(new URL('features/karel/editor/tutorial.ts', base));
   const { buildExecution } = await import(new URL('features/karel/hooks/use-karel-runner.ts', base));
+  const { getTotalLevelBeepers, isLevelGoalComplete } = await import(new URL('features/karel/goals/level-goal.ts', base));
   const bundle = await build({ entryPoints: [new URL('features/karel/editor/edit-program.ts', base).pathname], bundle: true, write: false, platform: 'node', format: 'esm' });
   const { configureProgramLine, insertProgramLines } = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
   const world = KAREL_LEVELS[0].initialWorld;
@@ -33,7 +34,7 @@ finalizar-programa`;
     assert.equal(getInsertionIndex(lines, 0), 1);
     assert.equal(getInsertionIndex(lines, null), 7);
     assert.equal(getInsertionIndex(lines, 2), 3);
-    assert.equal(getInsertionIndex(lines, 4), 4);
+    assert.equal(getInsertionIndex(lines, 4), 5);
   });
   test(`${root}: moving and deleting whole blocks preserves nesting and boundaries`, () => {
     const moved = moveCodeBlock(program, 2, 1);
@@ -56,6 +57,35 @@ finalizar-programa`;
     const inserted = insertProgramLines(program, ['avanza;'], 0);
     assert.equal(inserted.code.split('\n')[1], '  avanza;');
     assert.equal(inserted.code.split('\n').at(-1), 'finalizar-programa');
+    const insertedAfterSelection = insertProgramLines(program, ['coge-ficha;'], 3, {
+      index: getInsertionIndex(describeCodeLines(program), 3),
+      replaceSelection: false,
+    });
+    assert.equal(insertedAfterSelection.code.split('\n')[4], '      coge-ficha;');
+    assert.equal(insertedAfterSelection.code.split('\n')[3], '      gira-izquierda;');
+    const replacedSelection = insertProgramLines(program, ['coge-ficha;'], 3, {
+      index: 3,
+      replaceSelection: true,
+    });
+    assert.equal(replacedSelection.code.split('\n')[3], '      coge-ficha;');
+    assert.equal(replacedSelection.code.split('\n').length, program.split('\n').length);
+  });
+  test(`${root}: selecting fin inserts the next command outside the closed block`, () => {
+    const nestedClosingLine = 4;
+    const afterNestedBlock = insertProgramLines(program, ['coge-ficha;'], nestedClosingLine, {
+      index: getInsertionIndex(describeCodeLines(program), nestedClosingLine),
+      replaceSelection: false,
+    });
+    assert.equal(afterNestedBlock.code.split('\n')[5], '    coge-ficha;');
+    assert.equal(afterNestedBlock.code.split('\n')[6], '    avanza;');
+
+    const conditional = `iniciar-programa\n  si junto-a-ficha entonces inicio\n    coge-ficha;\n  fin;\nfinalizar-programa`;
+    const afterConditional = insertProgramLines(conditional, ['avanza;'], 3, {
+      index: getInsertionIndex(describeCodeLines(conditional), 3),
+      replaceSelection: false,
+    });
+    assert.equal(afterConditional.code.split('\n')[4], '  avanza;');
+    assert.equal(afterConditional.code.split('\n')[5], 'finalizar-programa');
   });
   test(`${root}: playback starts at line one without moving and executes consecutive moves once each`, () => {
     const { result, steps } = run('  avanza;\n  avanza;');
@@ -123,5 +153,19 @@ finalizar-programa`;
         );
       }
     }
+  });
+  test(`${root}: level goals require the intended route and all required beepers`, () => {
+    const levelThree = KAREL_LEVELS[2];
+    const levelFour = KAREL_LEVELS[3];
+    assert.equal(isLevelGoalComplete(levelThree, levelThree.initialWorld, []), false);
+    assert.equal(isLevelGoalComplete(levelFour, levelFour.initialWorld, []), false);
+    for (const level of [levelThree, levelFour]) {
+      const { steps } = buildExecution(level.starterCode, level.initialWorld);
+      assert.equal(isLevelGoalComplete(level, steps.at(-1).worldSnapshot, steps), true);
+    }
+    assert.equal(getTotalLevelBeepers(levelFour), 4);
+    const challenge = createKarelChallenge();
+    assert.equal(isLevelGoalComplete(challenge, challenge.initialWorld, []), false);
+    assert.ok(getTotalLevelBeepers(challenge) >= 2);
   });
 }

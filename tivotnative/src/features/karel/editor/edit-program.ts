@@ -9,7 +9,11 @@ export function insertProgramLines(code: string, source: string[], selected: num
   const replace = options?.replaceSelection !== false && selection && !selection.fixed
   const index = replace ? selected! : options?.index ?? getInsertionIndex(descriptions, selected)
   const previous = descriptions[index - 1]
-  const depth = replace ? selection.depth : previous?.opensBlock ? previous.depth + 1 : descriptions[index]?.depth ?? 1
+  const depth = replace
+    ? selection.depth
+    : previous?.opensBlock
+      ? previous.depth + 1
+      : previous?.depth ?? descriptions[index]?.depth ?? 1
   const lines = code.split('\n')
   lines.splice(index, replace ? selection.end - index + 1 : 0, ...source.map(line => '  '.repeat(Math.max(1, depth)) + line))
   return { code: lines.join('\n'), selected: index }

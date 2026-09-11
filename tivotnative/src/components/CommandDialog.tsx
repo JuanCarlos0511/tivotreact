@@ -1,4 +1,4 @@
-import { Check, X } from 'lucide-react-native'
+import { Check, ChevronDown, ChevronUp, X } from 'lucide-react-native'
 import { useState } from 'react'
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { CONDITION_OPTIONS, getConditionOptions, configureCommand, validateProcedureName, type Condition } from '../features/karel/editor/command-config'
@@ -7,13 +7,13 @@ import { ResponsiveDialog } from './ResponsiveDialog'
 import { ActionButton, IconButton, codeFont, colors } from './ui'
 import { Pressable } from 'react-native'
 
-export function CommandDialog({ command, code, conditions, initialLine, onClose, onInsert }: {
-  command: CommandTemplate; code: string; conditions: readonly Condition[]; initialLine?: string; onClose: () => void; onInsert: (source: string[]) => void
+export function CommandDialog({ command, code, conditions, initialLine, confirmLabel, onClose, onInsert }: {
+  command: CommandTemplate; code: string; conditions: readonly Condition[]; initialLine?: string; confirmLabel?: string; onClose: () => void; onInsert: (source: string[]) => void
 }) {
   const conditionOptions = getConditionOptions(conditions, initialLine)
   const originalName = initialLine?.match(/^define-nueva-instruccion\s+([\w-]+)/)?.[1]
   const [condition, setCondition] = useState<Condition>(() => CONDITION_OPTIONS.find(option => initialLine?.includes(option.value))?.value ?? conditions[0] ?? 'frente-libre')
-  const [count, setCount] = useState(initialLine?.match(/^repetir\s+(\d+)/)?.[1] ?? '2')
+  const [count, setCount] = useState(Number(initialLine?.match(/^repetir\s+(\d+)/)?.[1] ?? 2))
   const [name, setName] = useState(() => {
     if (originalName) return originalName
     const commands = getCustomCommands(describeCodeLines(code))
@@ -25,9 +25,9 @@ export function CommandDialog({ command, code, conditions, initialLine, onClose,
   const needsCondition = command.id === 'si' || command.id === 'mientras'
   const isRepeat = command.id === 'repetir'
   const error = isRepeat
-    ? (!/^\d+$/.test(count) || !Number.isSafeInteger(Number(count)) || Number(count) < 1 ? 'Escribe un número entero mayor que cero.' : null)
+    ? (!Number.isSafeInteger(count) || count < 1 ? 'Selecciona un número entero mayor que cero.' : null)
     : command.id === 'define-nueva-instruccion' ? validateProcedureName(name, code, originalName) : null
-  const source = configureCommand(command, condition, Number(count), name)
+  const source = configureCommand(command, condition, count, name)
   return (
     <ResponsiveDialog visible onClose={onClose} label={'Configurar ' + command.label}>
       <View style={styles.header}>
@@ -50,12 +50,30 @@ export function CommandDialog({ command, code, conditions, initialLine, onClose,
             <Text style={styles.description}>{option.description}</Text>
           </Pressable>
         ))}
-        {!needsCondition && (
+        {isRepeat && (
+          <View style={styles.repeatField}>
+            <Text style={styles.kicker}>Número de veces</Text>
+            <View accessibilityRole="adjustable" accessibilityLabel="Número de repeticiones"
+              accessibilityValue={{ min: 1, now: count, text: count + ' repeticiones' }} style={styles.repeatStepper}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Aumentar repeticiones"
+                onPress={() => setCount(current => current + 1)} style={({ pressed }) => [styles.repeatArrow, pressed && styles.repeatArrowPressed]}>
+                <ChevronUp size={28} color={colors.accentStrong} />
+              </Pressable>
+              <Text accessibilityLiveRegion="polite" style={styles.repeatNumber}>{count}</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Disminuir repeticiones" disabled={count <= 1}
+                onPress={() => setCount(current => Math.max(1, current - 1))}
+                style={({ pressed }) => [styles.repeatArrow, count <= 1 && styles.repeatArrowDisabled, pressed && count > 1 && styles.repeatArrowPressed]}>
+                <ChevronDown size={28} color={colors.accentStrong} />
+              </Pressable>
+            </View>
+          </View>
+        )}
+        {!needsCondition && !isRepeat && (
           <View style={styles.field}>
-            <Text style={styles.kicker}>{isRepeat ? 'Número de veces' : 'Nombre de la instrucción'}</Text>
-            <TextInput accessibilityLabel={isRepeat ? 'Número de veces' : 'Nombre de la instrucción'}
-              value={isRepeat ? count : name} onChangeText={isRepeat ? setCount : setName}
-              keyboardType={isRepeat ? 'number-pad' : 'default'} autoCapitalize="none" autoCorrect={false}
+            <Text style={styles.kicker}>Nombre de la instrucción</Text>
+            <TextInput accessibilityLabel="Nombre de la instrucción"
+              value={name} onChangeText={setName}
+              keyboardType="default" autoCapitalize="none" autoCorrect={false}
               style={styles.input} selectTextOnFocus />
           </View>
         )}
@@ -64,7 +82,7 @@ export function CommandDialog({ command, code, conditions, initialLine, onClose,
       </ScrollView>
       <View style={styles.actions}>
         <ActionButton label="Cancelar" onPress={onClose} />
-        <ActionButton label={initialLine ? 'Guardar' : 'Insertar'} variant="primary" disabled={Boolean(error)}
+        <ActionButton label={confirmLabel ?? (initialLine ? 'Guardar' : 'Insertar')} variant="primary" disabled={Boolean(error)}
           icon={<Check size={16} color={colors.accentDark} />} onPress={() => onInsert(source)} />
       </View>
     </ResponsiveDialog>
@@ -83,6 +101,12 @@ const styles = StyleSheet.create({
   syntax: { color: colors.blue, fontFamily: codeFont, fontSize: 11 },
   description: { color: colors.muted, fontSize: 12, lineHeight: 17 },
   field: { gap: 8 },
+  repeatField: { alignItems: 'center', gap: 8 },
+  repeatStepper: { width: 132, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: colors.line, borderRadius: 14, backgroundColor: colors.panelRaised, alignItems: 'center', gap: 4 },
+  repeatArrow: { width: 64, height: 36, borderRadius: 8, backgroundColor: colors.successBg, alignItems: 'center', justifyContent: 'center' },
+  repeatArrowPressed: { backgroundColor: '#c8f5df' },
+  repeatArrowDisabled: { opacity: 0.35 },
+  repeatNumber: { minWidth: 80, color: colors.text, fontSize: 38, lineHeight: 44, fontWeight: '900', textAlign: 'center' },
   input: { minHeight: 44, padding: 12, borderWidth: 1, borderColor: colors.line, borderRadius: 7, color: colors.text, backgroundColor: colors.panelRaised, fontSize: 14 },
   error: { color: colors.error, fontSize: 12 },
   preview: { padding: 12, borderWidth: 1, borderColor: colors.line, borderRadius: 8, backgroundColor: colors.panelSoft, color: colors.accentStrong, fontFamily: codeFont, fontSize: 11, lineHeight: 19 },

@@ -5,9 +5,10 @@ import { createKarelChallenge, KAREL_LEVELS } from '@shared/catalog'
 interface LevelSelectGridProps {
   onBack: () => void
   onSelectLevel: (level: KarelLevel) => void
+  onViewSavedGames: () => void
 }
 
-export function LevelSelectGrid({ onBack, onSelectLevel }: LevelSelectGridProps) {
+export function LevelSelectGrid({ onBack, onSelectLevel, onViewSavedGames }: LevelSelectGridProps) {
   return (
     <section className="navigation-screen level-select-screen">
       <header className="level-select-header">
@@ -36,8 +37,11 @@ export function LevelSelectGrid({ onBack, onSelectLevel }: LevelSelectGridProps)
           </button>
         ))}
 
-        <div className="arena-card" role="region" aria-labelledby="challenge-title">
+        <div className="arena-card" role="button" tabIndex={0} onClick={() => onSelectLevel(createKarelChallenge())}
+          onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onSelectLevel(createKarelChallenge()) }}
+          aria-label="Nivel 5: Desafío">
           <div className="arena-header">
+            <span className="arena-level-number">Nivel 5</span>
             <h2 className="arena-eyebrow" id="challenge-title">Desafío</h2>
           </div>
           <div className="arena-body">
@@ -45,8 +49,11 @@ export function LevelSelectGrid({ onBack, onSelectLevel }: LevelSelectGridProps)
               Enfréntate a mapas dinámicos y pon a prueba tu lógica resolviendo retos de programación con dificultad variable.
             </p>
             <div className="arena-actions">
-              <button type="button" className="arena-button primary" onClick={() => onSelectLevel(createKarelChallenge())}>
+              <span className="arena-button primary">
                 <Play size={14} /> Iniciar
+              </span>
+              <button className="saved-games-button" type="button" onClick={(event) => { event.stopPropagation(); onViewSavedGames() }}>
+                Ver mis partidas guardadas
               </button>
             </div>
           </div>

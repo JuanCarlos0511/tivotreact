@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Backpack, Lightbulb } from 'lucide-react'
-import type { KarelLevel, TivotAiContext, TivotChatSession, TivotExecutionSnapshot } from '@shared/types'
+import { ArrowLeft, Lightbulb } from 'lucide-react'
+import type { KarelLevel, KarelWorldState, TivotAiContext, TivotChatSession, TivotExecutionSnapshot } from '@shared/types'
 import { KarelCodeEditor } from '@features/karel/components/KarelCodeEditor'
 import { KarelGrid8x8 } from '@features/karel/components/KarelGrid8x8'
 import { buildExecution, useKarelRunner } from '@features/karel/hooks/use-karel-runner'
@@ -11,6 +11,8 @@ import { getInitialTutorialStepForLevel, getTutorialStepsForLevel, hasSeenLevelH
 import type { TutorialStep } from '@features/karel/editor/tutorial'
 import { useTivotAiContext } from '../hooks/use-tivot-ai-context'
 import { FloatingChatDrawer } from './FloatingChatDrawer'
+import { ChallengeExitDialog, LevelCompletionOverlay } from '@features/karel/components/LevelCompletionOverlay'
+import { describeMissingGoal, getTotalLevelBeepers, isLevelGoalComplete } from '@features/karel/goals/level-goal'
 
 interface ChatWorkspaceProps {
   session: TivotChatSession | null
@@ -23,6 +25,9 @@ interface ChatWorkspaceProps {
   onSubmitFlowOrder: (messageId: string, problemId: string, submittedOrder: string[]) => Promise<void>
   onResetConversation: () => void
   onBackToLevels: () => void
+  onNextLevel: () => void
+  onNewChallenge: () => void
+  onSaveChallenge: (level: KarelLevel, world: KarelWorldState, code: string) => void
 }
 
 export function ChatWorkspace({
@@ -36,6 +41,9 @@ export function ChatWorkspace({
   onSubmitFlowOrder,
   onResetConversation,
   onBackToLevels,
+  onNextLevel,
+  onNewChallenge,
+  onSaveChallenge,
 }: ChatWorkspaceProps) {
   const [code, setCode] = useState(activeLevel.starterCode)
   const [codeHistory, setCodeHistory] = useState<{ past: string[]; future: string[] }>({
@@ -52,6 +60,8 @@ export function ChatWorkspace({
     attempts: 0,
   })
   const [codeFeedback, setCodeFeedback] = useState<{ kind: 'success' | 'error'; message: string } | null>(null)
+  const [completionOpen, setCompletionOpen] = useState(false)
+  const [exitPromptOpen, setExitPromptOpen] = useState(false)
   const applyCodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initialTutorialStep = !hasSeenLevelHelp(activeLevel.id)
@@ -72,6 +82,8 @@ export function ChatWorkspace({
   const isChatTutorialStep = tutorialStep === 'chat'
   const tutorialSteps = getTutorialStepsForLevel(activeLevel.id)
   const editorTutorialFocus = tutorialStep === 'quickCommands' ? tutorialStep : null
+  const showBag = activeLevel.id === 4 || activeLevel.id === 5 || activeLevel.mode === 'challenge'
+  const totalBeepers = getTotalLevelBeepers(activeLevel)
   const chatPrompt = isChatTutorialStep
     ? 'Conoce a Tivot: sera tu guia de apoyo para aprender a programar paso a paso durante este reto.'
     : activeLevel.objective
@@ -94,6 +106,8 @@ export function ChatWorkspace({
       attempts: 0,
     })
     setCodeFeedback(null)
+    setCompletionOpen(false)
+    setExitPromptOpen(false)
     if (applyCodeTimerRef.current) clearTimeout(applyCodeTimerRef.current)
     if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
     const nextTutorialStep = !hasSeenLevelHelp(activeLevel.id)
@@ -114,6 +128,9 @@ export function ChatWorkspace({
 
   useEffect(() => {
     if (executionAttempts === 0) return
+    // runCurrentCode already records the running state. Avoid writing a new
+    // snapshot for every animated step; that creates a passive update chain.
+    if (runner.isRunning) return
 
     if (runner.executionError) {
       setLastExecution({
@@ -135,16 +152,6 @@ export function ChatWorkspace({
       return
     }
 
-    if (runner.isRunning) {
-      setLastExecution({
-        state: 'running',
-        message: 'El robot está probando el código ahora mismo.',
-        line: runner.activeLineNumber,
-        attempts: executionAttempts,
-      })
-      return
-    }
-
     if (runner.isPaused) {
       setLastExecution({
         state: 'paused',
@@ -160,12 +167,14 @@ export function ChatWorkspace({
       runner.steps.length > 0 &&
       runner.currentStepIndex === runner.steps.length - 1
     ) {
+      const goalComplete = isLevelGoalComplete(activeLevel, runner.worldState, runner.steps)
       setLastExecution({
         state: 'completed',
-        message: 'El robot terminó todas las instrucciones sin chocar.',
+        message: goalComplete ? '¡Objetivo cumplido! El nivel está completado.' : describeMissingGoal(activeLevel, runner.worldState),
         line: null,
         attempts: executionAttempts,
       })
+      if (goalComplete) setCompletionOpen(true)
     }
   }, [
     executionAttempts,
@@ -176,6 +185,8 @@ export function ChatWorkspace({
     runner.isPaused,
     runner.isRunning,
     runner.steps.length,
+    activeLevel,
+    runner.worldState,
   ])
 
   const advanceTutorial = () => {
@@ -282,10 +293,18 @@ export function ChatWorkspace({
     runner.runCode(code)
   }
 
+  const requestExit = () => {
+    if (runner.isRunning) runner.pauseExecution()
+    if (activeLevel.mode === 'challenge') setExitPromptOpen(true)
+    else onBackToLevels()
+  }
+
+  const saveCurrentChallenge = () => onSaveChallenge(activeLevel, runner.worldState, code)
+
   return (
     <section className={`karel-workspace ${tutorialStep ? 'karel-workspace-tutorial' : ''}`}>
       <header className="karel-game-header">
-        <button className="workspace-back-button" type="button" onClick={onBackToLevels} aria-label="Volver a niveles">
+        <button className="workspace-back-button" type="button" onClick={requestExit} aria-label="Volver a niveles">
           <ArrowLeft size={16} />
           <span>Volver</span>
         </button>
@@ -293,14 +312,14 @@ export function ChatWorkspace({
           <span className="workspace-level-badge">{activeLevel.mode === 'challenge' ? 'Desafío' : `Nivel ${activeLevel.id}`}</span>
           <div className="workspace-level-title-row">
             <h1>{activeLevel.title.replace(/^Nivel \d+: /, '')}</h1>
-            {activeLevel.id >= 4 && (
+            {showBag && (
               <div
-                className="workspace-bag-indicator"
-                aria-label={`Mochila: ${runner.worldState.bagBeepers} fichas`}
-                title={`Mochila: ${runner.worldState.bagBeepers} fichas`}
+                className="workspace-bag-indicator is-pulsing"
+                aria-label={`Mochila: ${runner.worldState.bagBeepers} de ${totalBeepers} fichas`}
+                title={`Mochila: ${runner.worldState.bagBeepers} de ${totalBeepers} fichas`}
               >
-                <Backpack size={17} aria-hidden="true" />
-                <span>{runner.worldState.bagBeepers}</span>
+                <span className="workspace-bag-emoji" aria-hidden="true">🎒</span>
+                <span>{runner.worldState.bagBeepers}/{totalBeepers}</span>
               </div>
             )}
           </div>
@@ -310,9 +329,9 @@ export function ChatWorkspace({
         </button>
       </header>
 
-      <KarelGrid8x8 world={runner.worldState} isRunning={runner.isRunning} hasError={Boolean(runner.executionError || runner.compileResult?.error)} wallCollision={Boolean(runner.executionError?.includes('muro'))} />
+      <KarelGrid8x8 world={runner.worldState} goal={activeLevel.goal.position} isRunning={runner.isRunning} hasError={Boolean(runner.executionError || runner.compileResult?.error)} wallCollision={Boolean(runner.executionError?.includes('muro'))} />
 
-      <KarelCodeEditor
+      {!isChatOpen && <KarelCodeEditor
         levelId={activeLevel.id}
         quickCommands={activeLevel.quickCommands}
         conditions={activeLevel.conditions}
@@ -342,7 +361,7 @@ export function ChatWorkspace({
         onTutorialNext={advanceTutorial}
         onTutorialPrevious={previousTutorial}
         onTutorialDismiss={dismissTutorial}
-      />
+      />}
 
       <FloatingChatDrawer
         session={session}
@@ -354,7 +373,10 @@ export function ChatWorkspace({
         isIntroPrompt={isChatTutorialStep}
         onContinueIntro={advanceTutorial}
         onDismissIntro={dismissTutorial}
-        onOpen={() => setIsChatOpen(true)}
+        onOpen={() => {
+          runner.pauseExecution()
+          setIsChatOpen(true)
+        }}
         onClose={() => setIsChatOpen(false)}
         onDismissObjective={dismissTutorial}
         onQueryChange={onQueryChange}
@@ -400,6 +422,20 @@ export function ChatWorkspace({
           </div>
         )}
       </GameHelpDialog>
+
+      {completionOpen && (
+        <LevelCompletionOverlay challenge={activeLevel.mode === 'challenge'}
+          onClose={() => setCompletionOpen(false)}
+          onPrimary={activeLevel.mode === 'challenge' ? onNewChallenge : onNextLevel}
+          onSecondary={() => {
+            if (activeLevel.mode === 'challenge') saveCurrentChallenge()
+            onBackToLevels()
+          }} />
+      )}
+      {exitPromptOpen && (
+        <ChallengeExitDialog onCancel={() => setExitPromptOpen(false)} onExit={onBackToLevels}
+          onSaveAndExit={() => { saveCurrentChallenge(); onBackToLevels() }} />
+      )}
     </section>
   )
 }

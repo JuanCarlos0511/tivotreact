@@ -1,11 +1,13 @@
-import { ArrowUp, Bot } from 'lucide-react'
-import type { KarelWorldState } from '@shared/types'
+import { ArrowUp } from 'lucide-react'
+import type { KarelWorldPoint, KarelWorldState } from '@shared/types'
+import { KarelPlayerArrow } from './KarelPlayerArrow'
 
 interface KarelGrid8x8Props {
   isRunning?: boolean
   hasError?: boolean
   wallCollision?: boolean
   world: KarelWorldState
+  goal: KarelWorldPoint
 }
 
 const STREETS = [8, 7, 6, 5, 4, 3, 2, 1] as const
@@ -14,7 +16,7 @@ const AVENUES = [1, 2, 3, 4, 5, 6, 7, 8] as const
 const DIRECTION_ANGLE = { NORTE: 0, ESTE: 90, SUR: 180, OESTE: 270 } as const
 const LABELS = { NORTE: 'Norte', ESTE: 'Este', SUR: 'Sur', OESTE: 'Oeste' }
 
-export function KarelGrid8x8({ world, isRunning = false, hasError = false, wallCollision = false }: KarelGrid8x8Props) {
+export function KarelGrid8x8({ world, goal, isRunning = false, hasError = false, wallCollision = false }: KarelGrid8x8Props) {
   const getBeeper = (street: number, avenue: number) =>
     world.beepers.find((beeper) => beeper.street === street && beeper.avenue === avenue)
 
@@ -38,14 +40,27 @@ export function KarelGrid8x8({ world, isRunning = false, hasError = false, wallC
             AVENUES.map((avenue) => {
               const hasKarel = world.karelPosition.street === street && world.karelPosition.avenue === avenue
               const beeper = getBeeper(street, avenue)
+              const isGoal = goal.street === street && goal.avenue === avenue
 
               return (
                 <div key={`${street}-${avenue}`} className="karel-cell">
-                  {beeper && <span className="beeper-badge">{beeper.count}</span>}
+                  {isGoal && (
+                    <span className={`karel-goal-marker ${hasKarel ? 'is-reached' : ''}`} aria-label={`Meta en calle ${street}, avenida ${avenue}`}>
+                      {!hasKarel && <span aria-hidden="true">★</span>}
+                    </span>
+                  )}
+                  {beeper && !hasKarel && <span className="beeper-badge">{beeper.count}</span>}
                   {hasKarel && (
-                    <span className={`karel-token ${isRunning ? 'karel-pulsing' : ''} ${hasError ? 'karel-error' : ''}`} aria-label={`Karel en calle ${world.karelPosition.street}, avenida ${world.karelPosition.avenue}, orientado al ${world.karelDirection}`}>
-                      <Bot size={17} />
-                      <span className="karel-direction" style={{ transform: `rotate(${DIRECTION_ANGLE[world.karelDirection]}deg)` }}><i /></span>
+                    <span
+                      className={`karel-token karel-user-arrow ${isRunning ? 'karel-pulsing' : ''} ${hasError ? 'karel-error' : ''}`}
+                      aria-label={`Karel en calle ${world.karelPosition.street}, avenida ${world.karelPosition.avenue}, orientado al ${world.karelDirection}${beeper ? `, sobre ${beeper.count} fichas` : ''}`}
+                    >
+                      <KarelPlayerArrow
+                        size={isGoal ? 32 : 38}
+                        hasError={hasError}
+                        direction={world.karelDirection}
+                        beeperCount={beeper?.count}
+                      />
                     </span>
                   )}
                 </div>

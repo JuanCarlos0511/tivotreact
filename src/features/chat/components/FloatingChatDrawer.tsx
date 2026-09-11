@@ -97,18 +97,18 @@ export function FloatingChatDrawer({
           </aside>
         )}
         <button
-          className={`floating-chat-button ${showIntroAttention ? 'floating-chat-button-attention' : ''}`}
+          className={`floating-chat-button ${showIntroAttention ? 'floating-chat-button-attention' : ''} ${isOpen ? 'is-open' : ''}`}
           type="button"
-          onClick={handleOpen}
-          aria-label="Abrir chat tutor"
+          onClick={isOpen ? onClose : handleOpen}
+          aria-label={isOpen ? 'Cerrar chat tutor' : 'Abrir chat tutor'}
+          aria-expanded={isOpen}
         >
           <MessageCircle size={22} />
           <span className="chat-pulse-badge" aria-hidden="true" />
         </button>
       </div>
       {isOpen && (
-        <div className="floating-chat-overlay" role="dialog" aria-modal="true" aria-label="Chat tutor de Karel">
-          <section className="floating-chat-drawer">
+          <section className="workspace-chat-panel" aria-label="Chat tutor de Karel">
             <header className="floating-chat-header">
               <div>
                 <span>Tutor IA</span>
@@ -177,7 +177,6 @@ export function FloatingChatDrawer({
               </button>
             </div>
           </section>
-        </div>
       )}
     </>
   )
