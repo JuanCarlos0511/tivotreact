@@ -9,11 +9,14 @@ export type TelemetryEventType =
   | 'IDLE_PERIOD_DETECTED'
   | 'SURVEY_SUBMITTED';
 
-// Error taxonomy
+// Error taxonomy (Karel y POS - Punto de Venta)
 export type ErrorCategory =
   | 'SYNTAX_ERROR'
+  | 'LOGIC_POS_RULE'
   | 'LOGIC_BUSINESS_RULE'
+  | 'INCOMPLETE_CODE'
   | 'INCOMPLETE_ALGORITHM'
+  | 'RUNTIME'
   | 'RUNTIME_EXCEPTION';
 
 // AI hint types
