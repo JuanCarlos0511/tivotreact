@@ -4,10 +4,10 @@ export class ExportService {
   exportEventsAsCSV(events: TelemetryEvent[]): string {
     if (events.length === 0) return '';
     const headers = [
-      'id', 'session_id', 'participant_id', 'level_id', 'step_index',
+      'event_id', 'session_id', 'participant_id', 'level_id', 'step_index',
       'event_type', 'is_success', 'attempt_number', 'active_time_ms',
       'idle_time_ms', 'error_category', 'error_message_snippet',
-      'ai_hint_type', 'ai_hint_effective', 'autonomy_score', 'payload', 'created_at'
+      'ai_hint_type', 'ai_hint_effective', 'autonomy_score', 'payload', 'timestamp'
     ];
     
     const lines = [headers.join(',')];

@@ -35,6 +35,25 @@ npm run build
 npm run lint
 ```
 
+## Ecosistema y despliegue
+
+El archivo `docker-compose.yml` levanta cuatro servicios desacoplados:
+
+- `frontend`: aplicación del estudiante en `http://localhost:8080`.
+- `backend`: API de telemetría en `http://localhost:8000/api/v1`.
+- `dashboard`: panel del investigador en `http://localhost:8081`.
+- `postgres`: base de datos interna, sin puerto público.
+
+Antes de desplegar, copia `.env.example` a `.env`, configura contraseñas y URLs públicas, y ejecuta:
+
+```bash
+docker compose up --build
+```
+
+El contenedor del backend ejecuta `alembic upgrade head` antes de iniciar FastAPI. Los frontends se compilan con Vite y se sirven con Nginx, incluyendo fallback para rutas SPA. En Dokploy se pueden publicar los tres servicios web por separado manteniendo `postgres` y la red `tivot_internal` como recursos privados.
+
+La telemetría utiliza IDs anónimos, una cola persistente offline-first e ingesta idempotente. No se envían nombre, correo, IP, agente de usuario ni resolución de pantalla.
+
 ## IA
 
-El proveedor por defecto es `mock`. Ollama puede usarse localmente. Gemini y OpenAI solo se activan con una API key capturada en runtime desde el modal de configuracion, guardada en `localStorage`.
+El proveedor se configura con las variables `VITE_AI_*` y `VITE_QWEN_*` descritas en `.env.example`.

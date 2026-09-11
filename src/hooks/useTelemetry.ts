@@ -3,4 +3,4 @@
  * Re-exporta useTelemetry desde la característica de telemetría.
  */
 export { useTelemetry } from '../features/telemetry/hooks/useTelemetry';
-export type { TelemetryEventType, ErrorCategory, AiHintType, TelemetryEvent, TelemetrySession, SurveyAnswers, QueueStatus } from '../types/telemetry';
+export type { ParticipantSession, TelemetryEventType, ErrorCategory, AiHintType, TelemetryEvent, TelemetrySession, SurveyAnswers, LikertScore, QueueStatus } from '../types/telemetry';

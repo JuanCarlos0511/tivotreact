@@ -171,6 +171,14 @@ export const useTivotChat = (activeLevel: KarelLevel | null) => {
       ),
     )
 
+    const normalizedPrompt = prompt.toLowerCase()
+    const hintType: AiHintType = /(?:código|codigo|solución|solucion)\s+(?:completo|direct[ao])|resu[eé]lvelo|hazlo por m[ií]/.test(normalizedPrompt)
+      ? 'Solución Directa'
+      : /error|sintaxis|corrige|falla|no funciona/.test(normalizedPrompt)
+        ? 'Corrección de Sintaxis'
+        : 'Conceptual'
+    telemetry.recordAiHintRequested(activeLevel.id, hintType)
+
     const response = await processTivotUserAction({
       userPayload: { user_action: 'send_message', message: prompt },
       context: sessionSnapshot.context,
@@ -191,16 +199,6 @@ export const useTivotChat = (activeLevel: KarelLevel | null) => {
           : session,
       ),
     )
-
-    // Telemetry: Record AI hint request with classification
-    if (activeLevel) {
-      const hintType: AiHintType = response.payload.suggestedCode?.length
-        ? 'Solución Directa'
-        : prompt.toLowerCase().includes('error') || prompt.toLowerCase().includes('falla') || prompt.toLowerCase().includes('no funciona')
-          ? 'Corrección de Sintaxis'
-          : 'Conceptual'
-      telemetry.recordAiHintRequested(activeLevel.id, hintType)
-    }
 
     setIsResponding(false)
   }

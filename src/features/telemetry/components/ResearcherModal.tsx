@@ -80,7 +80,7 @@ export function ResearcherModal({
               {sessionInfo ? (
                 <p>
                   Sesión activa: {sessionInfo.participant_id} 
-                  {sessionInfo.group_id ? ` (Grupo: ${sessionInfo.group_id})` : ''} 
+                  {sessionInfo.condition ? ` (Condición: ${sessionInfo.condition})` : ''}
                   - {sessionInfo.has_assent ? 'Con consentimiento' : 'Solo práctica'}
                 </p>
               ) : (

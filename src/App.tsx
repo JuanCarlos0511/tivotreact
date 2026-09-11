@@ -8,7 +8,6 @@ import { StartScreen } from '@features/navigation/StartScreen'
 import { createKarelChallenge, getKarelLevelById } from '@shared/catalog'
 import { deleteSavedChallenge, loadSavedChallenges, renameSavedChallenge, saveChallenge } from '@features/karel/storage/saved-challenges'
 import type { KarelLevel, KarelWorldState, SavedChallengeGame } from '@shared/types'
-import { useTelemetry } from './hooks/useTelemetry'
 import './index.css'
 import './mobile-game.css'
 
@@ -20,7 +19,6 @@ function App() {
   const [activeLevel, setActiveLevel] = useState<KarelLevel | null>(null)
   const [savedGames, setSavedGames] = useState<SavedChallengeGame[]>(() => loadSavedChallenges())
   const chat = useTivotChat(activeLevel)
-  const telemetry = useTelemetry()
 
   useEffect(() => applyTheme(theme), [theme])
   useEffect(() => {
@@ -49,7 +47,6 @@ function App() {
   const handleSelectLevel = (level: KarelLevel) => {
     setActiveLevel(level)
     setScreen('WORKSPACE')
-    telemetry.recordLevelStart(level.id)
   }
 
   const handleBackToLevels = () => {
@@ -63,9 +60,6 @@ function App() {
 
   const handleNextLevel = () => {
     if (!activeLevel) return
-    if (activeLevel.id === 4) {
-      telemetry.showSurvey()
-    }
     const next = activeLevel.id < 4 ? getKarelLevelById(activeLevel.id + 1) : createKarelChallenge()
     if (next) handleSelectLevel(next)
   }

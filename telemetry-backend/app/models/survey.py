@@ -18,7 +18,9 @@ class SurveyResponse(Base):
     sus_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     tam_perceived_usefulness: Mapped[float] = mapped_column(Float)
     tam_perceived_ease_of_use: Mapped[float] = mapped_column(Float)
+    tam_ai_scaffolding: Mapped[float] = mapped_column(Float)
     tam_ai_trust: Mapped[float] = mapped_column(Float)
+    tam_intention_to_use: Mapped[float] = mapped_column(Float)
     
     raw_answers: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
     submitted_at: Mapped[datetime] = mapped_column(server_default=func.now())

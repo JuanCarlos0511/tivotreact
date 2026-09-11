@@ -44,7 +44,7 @@ async def get_metrics(db: AsyncSession = Depends(get_db)):
         )
         .where(
             and_(
-                TelemetryEvent.event_type == "CODE_EXECUTION_ATTEMPT",
+                TelemetryEvent.event_type == "code_run",
                 TelemetryEvent.active_time_ms.is_not(None),
             )
         )
@@ -77,7 +77,7 @@ async def get_metrics(db: AsyncSession = Depends(get_db)):
             TelemetryEvent.level_id,
             func.count(distinct(TelemetryEvent.participant_id)),
         )
-        .where(TelemetryEvent.event_type == "LEVEL_START")
+        .where(TelemetryEvent.event_type == "level_started")
         .group_by(TelemetryEvent.level_id)
     )
     started_by_level = {int(r[0]): int(r[1]) for r in started_q.all()}
@@ -87,7 +87,7 @@ async def get_metrics(db: AsyncSession = Depends(get_db)):
             TelemetryEvent.level_id,
             func.count(distinct(TelemetryEvent.participant_id)),
         )
-        .where(TelemetryEvent.event_type == "LEVEL_COMPLETE")
+        .where(TelemetryEvent.event_type == "level_completed")
         .group_by(TelemetryEvent.level_id)
     )
     completed_by_level = {int(r[0]): int(r[1]) for r in completed_level_q.all()}

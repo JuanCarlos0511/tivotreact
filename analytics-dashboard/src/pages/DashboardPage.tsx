@@ -9,7 +9,7 @@ import { SurveyLikertChart } from '../components/metrics/SurveyLikertChart';
 import { Users, TrendingDown, Timer, Award, Filter, RefreshCw, AlertCircle } from 'lucide-react';
 
 export function DashboardPage() {
-  const [selectedGroup, setSelectedGroup] = useState<string>('Todos');
+  const [selectedCondition, setSelectedCondition] = useState<string>('Todos');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,11 +24,11 @@ export function DashboardPage() {
     setError(null);
     try {
       const [ov, lc, sc, et, ss] = await Promise.all([
-        api.getOverview(selectedGroup),
-        api.getLearningCurve(selectedGroup),
-        api.getScaffoldingEfficacy(selectedGroup),
-        api.getErrorTaxonomy(selectedGroup),
-        api.getSurveySummary(selectedGroup),
+        api.getOverview(selectedCondition),
+        api.getLearningCurve(selectedCondition),
+        api.getScaffoldingEfficacy(selectedCondition),
+        api.getErrorTaxonomy(selectedCondition),
+        api.getSurveySummary(selectedCondition),
       ]);
       setOverview(ov);
       setLearningCurve(lc);
@@ -45,7 +45,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     fetchData();
-  }, [selectedGroup]);
+  }, [selectedCondition]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -59,17 +59,16 @@ export function DashboardPage() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs">
             <Filter className="w-3.5 h-3.5 text-slate-500" />
-            <span className="font-semibold text-slate-600">Grupo:</span>
+            <span className="font-semibold text-slate-600">Condición:</span>
             <select
-              value={selectedGroup}
-              onChange={(e) => setSelectedGroup(e.target.value)}
+              value={selectedCondition}
+              onChange={(e) => setSelectedCondition(e.target.value)}
               className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
             >
-              <option value="Todos">Todos los Grupos</option>
-              <option value="GRUPO-3A">Grupo 3A</option>
-              <option value="GRUPO-3B">Grupo 3B</option>
-              <option value="GRUPO-3C">Grupo 3C</option>
-              <option value="Sin Grupo">Sin Grupo Asignado</option>
+              <option value="Todos">Todas</option>
+              <option value="standard">Estándar</option>
+              <option value="ai_tutor">Tutor IA</option>
+              <option value="control">Control</option>
             </select>
           </div>
 

@@ -3,7 +3,7 @@ import type {
   ErrorTaxonomy, SurveySummary, ParticipantsResponse 
 } from '../types/analytics';
 
-const RAW_API_URL = (import.meta.env.VITE_TELEMETRY_API_URL || 'http://localhost:8000/api/v1').trim().replace(/\/+$/, '');
+const RAW_API_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_TELEMETRY_API_URL || 'http://localhost:8000/api/v1').trim().replace(/\/+$/, '');
 
 function getBaseUrl(): string {
   if (RAW_API_URL.endsWith('/api/v1')) {
@@ -74,35 +74,35 @@ class ApiService {
     return data;
   }
 
-  async getOverview(groupId?: string): Promise<OverviewMetrics> {
-    const query = groupId && groupId !== 'Todos' ? `?group_id=${encodeURIComponent(groupId)}` : '';
+  async getOverview(condition?: string): Promise<OverviewMetrics> {
+    const query = condition && condition !== 'Todos' ? `?condition=${encodeURIComponent(condition)}` : '';
     return this.request<OverviewMetrics>(`/analytics/overview${query}`);
   }
 
-  async getLearningCurve(groupId?: string): Promise<LearningCurveLevel[]> {
-    const query = groupId && groupId !== 'Todos' ? `?group_id=${encodeURIComponent(groupId)}` : '';
+  async getLearningCurve(condition?: string): Promise<LearningCurveLevel[]> {
+    const query = condition && condition !== 'Todos' ? `?condition=${encodeURIComponent(condition)}` : '';
     return this.request<LearningCurveLevel[]>(`/analytics/learning-curve${query}`);
   }
 
-  async getScaffoldingEfficacy(groupId?: string): Promise<ScaffoldingItem[]> {
-    const query = groupId && groupId !== 'Todos' ? `?group_id=${encodeURIComponent(groupId)}` : '';
+  async getScaffoldingEfficacy(condition?: string): Promise<ScaffoldingItem[]> {
+    const query = condition && condition !== 'Todos' ? `?condition=${encodeURIComponent(condition)}` : '';
     return this.request<ScaffoldingItem[]>(`/analytics/scaffolding-efficacy${query}`);
   }
 
-  async getErrorTaxonomy(groupId?: string): Promise<ErrorTaxonomy> {
-    const query = groupId && groupId !== 'Todos' ? `?group_id=${encodeURIComponent(groupId)}` : '';
+  async getErrorTaxonomy(condition?: string): Promise<ErrorTaxonomy> {
+    const query = condition && condition !== 'Todos' ? `?condition=${encodeURIComponent(condition)}` : '';
     return this.request<ErrorTaxonomy>(`/analytics/error-taxonomy${query}`);
   }
 
-  async getSurveySummary(groupId?: string): Promise<SurveySummary> {
-    const query = groupId && groupId !== 'Todos' ? `?group_id=${encodeURIComponent(groupId)}` : '';
+  async getSurveySummary(condition?: string): Promise<SurveySummary> {
+    const query = condition && condition !== 'Todos' ? `?condition=${encodeURIComponent(condition)}` : '';
     return this.request<SurveySummary>(`/analytics/survey-summary${query}`);
   }
 
-  async getParticipants(page = 1, pageSize = 20, groupId?: string): Promise<ParticipantsResponse> {
+  async getParticipants(page = 1, pageSize = 20, condition?: string): Promise<ParticipantsResponse> {
     const params = new URLSearchParams({ page: page.toString(), page_size: pageSize.toString() });
-    if (groupId && groupId !== 'Todos') {
-      params.append('group_id', groupId);
+    if (condition && condition !== 'Todos') {
+      params.append('condition', condition);
     }
     return this.request<ParticipantsResponse>(`/analytics/participants?${params.toString()}`);
   }

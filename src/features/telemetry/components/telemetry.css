@@ -103,6 +103,8 @@
 .telemetry-survey-modal {
   width: min(100%, 580px);
   padding: 32px;
+  max-height: min(90vh, 760px);
+  overflow: hidden;
 }
 
 .telemetry-survey-questions {
@@ -111,6 +113,49 @@
   gap: 24px;
   width: 100%;
   margin: 20px 0;
+  padding-right: 8px;
+  overflow-y: auto;
+}
+
+.telemetry-survey-questions h3 {
+  margin: 4px 0 -8px;
+  color: #065f46;
+  font-size: 15px;
+}
+
+.telemetry-survey-actions {
+  flex-direction: row;
+  width: 100%;
+}
+
+.telemetry-survey-actions > button {
+  flex: 1;
+}
+
+.telemetry-anonymous-code {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid #d9d8cd;
+  border-radius: 10px;
+  background: #fff;
+  text-align: center;
+}
+
+.telemetry-anonymous-code span,
+.telemetry-anonymous-code small {
+  color: #5e6a64;
+  font-size: 12px;
+}
+
+.telemetry-anonymous-code strong {
+  font-size: 18px;
+  letter-spacing: 0.08em;
+}
+
+.telemetry-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .telemetry-question {

@@ -6,13 +6,13 @@ import { ShieldCheck, ChevronLeft, ChevronRight, Filter, RefreshCw, UserX } from
 export function ParticipantsPage() {
   const [data, setData] = useState<ParticipantsResponse | null>(null);
   const [page, setPage] = useState<number>(1);
-  const [selectedGroup, setSelectedGroup] = useState<string>('Todos');
+  const [selectedCondition, setSelectedCondition] = useState<string>('Todos');
   const [loading, setLoading] = useState<boolean>(true);
 
   const fetchParticipants = async () => {
     setLoading(true);
     try {
-      const res = await api.getParticipants(page, 15, selectedGroup);
+      const res = await api.getParticipants(page, 15, selectedCondition);
       setData(res);
     } catch {
       // Handle error
@@ -23,7 +23,7 @@ export function ParticipantsPage() {
 
   useEffect(() => {
     fetchParticipants();
-  }, [page, selectedGroup]);
+  }, [page, selectedCondition]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -36,20 +36,19 @@ export function ParticipantsPage() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs">
             <Filter className="w-3.5 h-3.5 text-slate-500" />
-            <span className="font-semibold text-slate-600">Grupo:</span>
+            <span className="font-semibold text-slate-600">Condición:</span>
             <select
-              value={selectedGroup}
+              value={selectedCondition}
               onChange={(e) => {
-                setSelectedGroup(e.target.value);
+                setSelectedCondition(e.target.value);
                 setPage(1);
               }}
               className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
             >
-              <option value="Todos">Todos los Grupos</option>
-              <option value="GRUPO-3A">Grupo 3A</option>
-              <option value="GRUPO-3B">Grupo 3B</option>
-              <option value="GRUPO-3C">Grupo 3C</option>
-              <option value="Sin Grupo">Sin Grupo</option>
+              <option value="Todos">Todas</option>
+              <option value="standard">Estándar</option>
+              <option value="ai_tutor">Tutor IA</option>
+              <option value="control">Control</option>
             </select>
           </div>
 
@@ -69,7 +68,7 @@ export function ParticipantsPage() {
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
               <tr>
                 <th className="px-6 py-4">ID Participante</th>
-                <th className="px-6 py-4">Grupo Escolar</th>
+                <th className="px-6 py-4">Condición</th>
                 <th className="px-6 py-4">Asentimiento</th>
                 <th className="px-6 py-4">Nivel Máx.</th>
                 <th className="px-6 py-4">Tiempo Activo</th>
@@ -98,7 +97,7 @@ export function ParticipantsPage() {
                       <ShieldCheck className="w-4 h-4 text-emerald-600" />
                       {p.participant_id}
                     </td>
-                    <td className="px-6 py-4 text-slate-600 font-semibold">{p.group_id}</td>
+                    <td className="px-6 py-4 text-slate-600 font-semibold">{p.condition}</td>
                     <td className="px-6 py-4">
                       {p.has_assent ? (
                         <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">

@@ -1,66 +1,85 @@
-from pydantic import BaseModel, Field, ConfigDict, StringConstraints
-from typing import Optional, Any, Literal, List
 from datetime import datetime
+from typing import Any, Literal
 import uuid
+
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from typing_extensions import Annotated
 
-ParticipantId = Annotated[str, StringConstraints(pattern=r"^[a-zA-Z0-9_-]{3,20}$")]
+ParticipantId = Annotated[str, StringConstraints(pattern=r"^[a-zA-Z0-9_-]{3,32}$")]
+EventType = Literal[
+    "session_started",
+    "level_started",
+    "code_run",
+    "syntax_error",
+    "ai_hint_requested",
+    "level_completed",
+    "idle_detected",
+    "survey_submitted",
+]
+Likert = Annotated[int, Field(ge=1, le=5)]
+
 
 class SessionCreate(BaseModel):
-    """Esquema para la creación de una nueva sesión."""
+    """Sesión anónima generada por el cliente; no admite campos de PII."""
+
+    session_id: uuid.UUID
     participant_id: ParticipantId
-    group_id: Optional[str] = None
+    entry_timestamp: datetime
+    condition: str = Field(default="standard", min_length=1, max_length=64)
     has_assent: bool
-    screen_resolution: Optional[str] = None
-    user_agent: Optional[str] = None
+
 
 class SessionResponse(BaseModel):
-    """Respuesta al crear o consultar una sesión."""
-    id: uuid.UUID
+    session_id: uuid.UUID = Field(validation_alias="id")
     participant_id: str
-    started_at: datetime
-    model_config = ConfigDict(from_attributes=True)
+    entry_timestamp: datetime = Field(validation_alias="started_at")
+    condition: str
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
 
 class TelemetryEventCreate(BaseModel):
-    """Esquema para un evento individual de telemetría."""
+    event_id: uuid.UUID
     session_id: uuid.UUID
-    participant_id: str
-    level_id: int = Field(ge=1, le=99)
-    step_index: Optional[int] = None
-    event_type: str  # Could be restricted to a Literal union if needed
-    is_success: Optional[bool] = None
-    attempt_number: Optional[int] = None
-    active_time_ms: Optional[int] = None
-    idle_time_ms: Optional[int] = None
-    error_category: Optional[str] = None
-    error_message_snippet: Optional[str] = Field(None, max_length=250)
-    ai_hint_type: Optional[str] = None
-    ai_hint_effective: Optional[bool] = None
-    autonomy_score: Optional[float] = None
-    payload: Optional[dict[str, Any]] = None
-    created_at: datetime
+    participant_id: ParticipantId
+    level_id: int = Field(ge=0, le=99)
+    event_type: EventType
+    payload: dict[str, Any] | None = None
+    timestamp: datetime
+    step_index: int | None = None
+    is_success: bool | None = None
+    attempt_number: int | None = Field(default=None, ge=1)
+    active_time_ms: int | None = Field(default=None, ge=0)
+    idle_time_ms: int | None = Field(default=None, ge=0)
+    error_category: str | None = Field(default=None, max_length=64)
+    error_message_snippet: str | None = Field(default=None, max_length=250)
+    ai_hint_type: str | None = Field(default=None, max_length=64)
+    ai_hint_effective: bool | None = None
+    autonomy_score: float | None = None
+
 
 class TelemetryBatchRequest(BaseModel):
-    """Esquema para la ingesta en lote de eventos."""
-    events: List[TelemetryEventCreate] = Field(min_length=1, max_length=100)
+    events: list[TelemetryEventCreate] = Field(min_length=1, max_length=100)
+
 
 class TelemetryBatchResponse(BaseModel):
-    """Respuesta tras procesar un lote de eventos."""
     received: int
     stored: int
 
+
 class SurveyCreate(BaseModel):
-    """Esquema para la creación de la encuesta final."""
     session_id: uuid.UUID
-    participant_id: Optional[str] = None
-    tam_perceived_usefulness: float = Field(ge=1.0, le=5.0)
-    tam_perceived_ease_of_use: float = Field(ge=1.0, le=5.0)
-    tam_ai_trust: float = Field(ge=1.0, le=5.0)
-    raw_answers: Optional[dict[str, Any]] = None
+    participant_id: ParticipantId | None = None
+    tam_perceived_usefulness: Likert
+    tam_perceived_ease_of_use: Likert
+    tam_ai_scaffolding: Likert
+    tam_ai_trust: Likert
+    tam_intention_to_use: Likert
+    sus: list[Likert] = Field(min_length=10, max_length=10)
+    raw_answers: dict[str, Any] | None = None
+
 
 class SurveyResponse_(BaseModel):
-    """Respuesta al crear una encuesta."""
     id: uuid.UUID
-    sus_score: Optional[float]
+    sus_score: float | None
     submitted_at: datetime
     model_config = ConfigDict(from_attributes=True)

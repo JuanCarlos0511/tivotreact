@@ -149,8 +149,7 @@ export function ChatWorkspace({
       const errCategory: ErrorCategory = runner.executionError.includes('muro') || runner.executionError.includes('fichas') || runner.executionError.includes('mochila')
         ? 'RUNTIME_EXCEPTION'
         : 'RUNTIME_EXCEPTION'
-      telemetry.recordCodeExecution(activeLevel.id, executionAttempts, false, errCategory, runner.executionError.slice(0, 250))
-      telemetry.evaluateHintEffectiveness(activeLevel.id, false)
+      telemetry.recordCodeExecution(activeLevel.id, executionAttempts, false, errCategory, runner.executionError.slice(0, 250), code)
       return
     }
 
@@ -162,8 +161,7 @@ export function ChatWorkspace({
         attempts: executionAttempts,
       })
       // Telemetry: Compile/syntax error
-      telemetry.recordCodeExecution(activeLevel.id, executionAttempts, false, 'SYNTAX_ERROR', runner.compileResult.error.message.slice(0, 250))
-      telemetry.evaluateHintEffectiveness(activeLevel.id, false)
+      telemetry.recordCodeExecution(activeLevel.id, executionAttempts, false, 'SYNTAX_ERROR', runner.compileResult.error.message.slice(0, 250), code)
       return
     }
 
@@ -193,21 +191,15 @@ export function ChatWorkspace({
       if (goalComplete) {
         // Telemetry: Successful execution + level complete
         const activeTimeMs = Date.now() - levelStartTimeRef.current
-        telemetry.recordCodeExecution(activeLevel.id, executionAttempts, true)
-        telemetry.evaluateHintEffectiveness(activeLevel.id, true)
+        telemetry.recordCodeExecution(activeLevel.id, executionAttempts, true, undefined, undefined, code)
         telemetry.recordLevelComplete(activeLevel.id, executionAttempts, activeTimeMs)
         setCompletionOpen(true)
-        // Trigger survey after Level 4
-        if (activeLevel.id === 4) {
-          telemetry.showSurvey()
-        }
       } else {
         // Telemetry: Code ran but didn't meet goal = logic/incomplete algorithm error
         const errCategory: ErrorCategory = runner.worldState.beepers.some(b => b.count > 0) && activeLevel.goal.requireAllBeepers
           ? 'LOGIC_BUSINESS_RULE'
           : 'INCOMPLETE_ALGORITHM'
-        telemetry.recordCodeExecution(activeLevel.id, executionAttempts, false, errCategory, describeMissingGoal(activeLevel, runner.worldState).slice(0, 250))
-        telemetry.evaluateHintEffectiveness(activeLevel.id, false)
+        telemetry.recordCodeExecution(activeLevel.id, executionAttempts, false, errCategory, describeMissingGoal(activeLevel, runner.worldState).slice(0, 250), code)
       }
     }
   }, [
@@ -459,9 +451,19 @@ export function ChatWorkspace({
 
       {completionOpen && (
         <LevelCompletionOverlay challenge={activeLevel.mode === 'challenge'}
-          onClose={() => setCompletionOpen(false)}
-          onPrimary={activeLevel.mode === 'challenge' ? onNewChallenge : onNextLevel}
+          onClose={() => {
+            setCompletionOpen(false)
+            if (activeLevel.id === 4) telemetry.showSurvey()
+          }}
+          onPrimary={() => {
+            setCompletionOpen(false)
+            if (activeLevel.id === 4) telemetry.showSurvey()
+            if (activeLevel.mode === 'challenge') onNewChallenge()
+            else onNextLevel()
+          }}
           onSecondary={() => {
+            setCompletionOpen(false)
+            if (activeLevel.id === 4) telemetry.showSurvey()
             if (activeLevel.mode === 'challenge') saveCurrentChallenge()
             onBackToLevels()
           }} />

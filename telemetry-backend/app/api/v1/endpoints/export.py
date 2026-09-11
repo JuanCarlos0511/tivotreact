@@ -23,11 +23,11 @@ def format_csv_row(row: list) -> str:
 
 async def stream_student_summary_csv(db: AsyncSession):
     headers = [
-        "participant_id", "group_id", "has_assent",
+        "participant_id", "condition", "has_assent",
         "attempts_lvl1", "attempts_lvl2", "attempts_lvl3", "attempts_lvl4",
         "time_lvl1_s", "time_lvl2_s", "time_lvl3_s", "time_lvl4_s",
         "total_active_time_s", "total_hints_requested", "hints_effective_count",
-        "tam_pu", "tam_peou", "tam_ai_trust", "sus_score"
+        "tam_pu", "tam_peou", "tam_ai_scaffolding", "tam_ai_trust", "tam_intention_to_use", "sus_score"
     ]
     yield format_csv_row(headers)
 
@@ -47,7 +47,7 @@ async def stream_student_summary_csv(db: AsyncSession):
 
             time_q = await db.execute(
                 select(TelemetryEvent.active_time_ms)
-                .where(and_(TelemetryEvent.session_id == s.id, TelemetryEvent.level_id == lvl, TelemetryEvent.event_type == "LEVEL_COMPLETE"))
+                .where(and_(TelemetryEvent.session_id == s.id, TelemetryEvent.level_id == lvl, TelemetryEvent.event_type == "level_completed"))
             )
             t_ms = time_q.scalar_one()
             times[lvl] = round(t_ms / 1000, 2) if t_ms else 0.0
@@ -55,14 +55,14 @@ async def stream_student_summary_csv(db: AsyncSession):
         # Total active time
         tot_time_q = await db.execute(
             select(func.sum(TelemetryEvent.active_time_ms))
-            .where(and_(TelemetryEvent.session_id == s.id, TelemetryEvent.event_type == "LEVEL_COMPLETE"))
+            .where(and_(TelemetryEvent.session_id == s.id, TelemetryEvent.event_type == "level_completed"))
         )
         total_time_ms = tot_time_q.scalar_one() or 0
 
         # Hints
         hints_q = await db.execute(
             select(func.count(TelemetryEvent.id))
-            .where(and_(TelemetryEvent.session_id == s.id, TelemetryEvent.event_type == "AI_HINT_REQUESTED"))
+            .where(and_(TelemetryEvent.session_id == s.id, TelemetryEvent.event_type == "ai_hint_requested"))
         )
         total_hints = hints_q.scalar_one() or 0
 
@@ -78,7 +78,7 @@ async def stream_student_summary_csv(db: AsyncSession):
 
         row = [
             s.participant_id,
-            s.group_id or "Sin Grupo",
+            s.condition,
             s.has_assent,
             attempts.get(1, 0),
             attempts.get(2, 0),
@@ -93,7 +93,9 @@ async def stream_student_summary_csv(db: AsyncSession):
             eff_hints,
             surv.tam_perceived_usefulness if surv else None,
             surv.tam_perceived_ease_of_use if surv else None,
+            surv.tam_ai_scaffolding if surv else None,
             surv.tam_ai_trust if surv else None,
+            surv.tam_intention_to_use if surv else None,
             surv.sus_score if surv else None,
         ]
         yield format_csv_row(row)
@@ -143,14 +145,13 @@ async def export_xlsx(db: AsyncSession = Depends(get_db)):
     # Sheet 1: Participantes
     ws1 = wb.active
     ws1.title = "1_Participantes"
-    ws1.append(["Participant ID", "Grupo", "Asentimiento", "Resolución", "Inicio", "Fin"])
+    ws1.append(["Participant ID", "Condición", "Asentimiento", "Inicio", "Fin"])
 
     sessions_q = await db.execute(select(Session).order_by(Session.started_at.asc()))
     sessions = sessions_q.scalars().all()
     for s in sessions:
         ws1.append([
-            s.participant_id, s.group_id or "N/A", "Sí" if s.has_assent else "No",
-            s.screen_resolution or "N/A",
+            s.participant_id, s.condition, "Sí" if s.has_assent else "No",
             s.started_at.strftime("%Y-%m-%d %H:%M:%S") if s.started_at else "",
             s.completed_at.strftime("%Y-%m-%d %H:%M:%S") if s.completed_at else "",
         ])
@@ -161,7 +162,7 @@ async def export_xlsx(db: AsyncSession = Depends(get_db)):
 
     events_q = await db.execute(
         select(TelemetryEvent)
-        .where(TelemetryEvent.event_type.in_(["LEVEL_COMPLETE", "CODE_EXECUTION_ATTEMPT"]))
+        .where(TelemetryEvent.event_type.in_(["level_completed", "code_run", "syntax_error"]))
         .order_by(TelemetryEvent.created_at.asc())
     )
     events = events_q.scalars().all()
@@ -179,7 +180,7 @@ async def export_xlsx(db: AsyncSession = Depends(get_db)):
 
     hints_q = await db.execute(
         select(TelemetryEvent)
-        .where(TelemetryEvent.event_type == "AI_HINT_REQUESTED")
+        .where(TelemetryEvent.event_type == "ai_hint_requested")
         .order_by(TelemetryEvent.created_at.asc())
     )
     hints = hints_q.scalars().all()
@@ -192,14 +193,15 @@ async def export_xlsx(db: AsyncSession = Depends(get_db)):
 
     # Sheet 4: Encuesta TAM SUS
     ws4 = wb.create_sheet(title="4_Encuesta_TAM_SUS")
-    ws4.append(["Participant ID", "TAM Utilidad (PU)", "TAM Facilidad (PEOU)", "TAM Confianza IA", "SUS Score (0-100)", "Fecha"])
+    ws4.append(["Participant ID", "TAM Utilidad (PU)", "TAM Facilidad (PEOU)", "TAM Andamiaje IA", "TAM Confianza IA", "TAM Intención de Uso", "SUS Score (0-100)", "Fecha"])
 
     surv_q = await db.execute(select(SurveyResponse).order_by(SurveyResponse.submitted_at.asc()))
     surveys = surv_q.scalars().all()
     for surv in surveys:
         ws4.append([
             surv.participant_id, surv.tam_perceived_usefulness,
-            surv.tam_perceived_ease_of_use, surv.tam_ai_trust,
+            surv.tam_perceived_ease_of_use, surv.tam_ai_scaffolding,
+            surv.tam_ai_trust, surv.tam_intention_to_use,
             surv.sus_score if surv.sus_score is not None else "N/A",
             surv.submitted_at.strftime("%Y-%m-%d %H:%M:%S") if surv.submitted_at else "",
         ])

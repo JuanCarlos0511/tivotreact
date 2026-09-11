@@ -67,7 +67,7 @@ export interface SurveySummary {
 export interface ParticipantItem {
   id: string;
   participant_id: string;
-  group_id: string;
+  condition: string;
   has_assent: boolean;
   max_level: number;
   total_active_time_s: number;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { SurveyAnswers } from '../../../types/telemetry';
+import type { LikertScore, SurveyAnswers } from '../../../types/telemetry';
 import './telemetry.css';
 
 interface Props {
@@ -8,76 +8,81 @@ interface Props {
   onSkip: () => void;
 }
 
-export function PostPracticeSurveyModal({ isOpen, onSubmit, onSkip }: Props) {
-  const [answers, setAnswers] = useState<Partial<SurveyAnswers>>({});
+const tamQuestions = [
+  ['tam_perceived_usefulness', 'Tivot me ayudó a comprender mejor la lógica de programación.'],
+  ['tam_perceived_ease_of_use', 'La interfaz y los controles fueron fáciles de usar.'],
+  ['tam_ai_scaffolding', 'Las explicaciones del tutor de IA me ayudaron a avanzar.'],
+  ['tam_ai_trust', 'Confío en las sugerencias del tutor de IA.'],
+  ['tam_intention_to_use', 'Me gustaría usar Tivot en otras actividades de aprendizaje.'],
+] as const;
 
+const susQuestions = [
+  'Me gustaría usar Tivot con frecuencia.',
+  'Tivot me pareció innecesariamente complejo.',
+  'Tivot me pareció fácil de usar.',
+  'Necesitaría ayuda técnica para usar Tivot.',
+  'Las funciones de Tivot están bien integradas.',
+  'Encontré demasiadas inconsistencias en Tivot.',
+  'La mayoría de las personas aprendería a usar Tivot rápidamente.',
+  'Tivot me pareció incómodo o difícil de usar.',
+  'Me sentí seguro al usar Tivot.',
+  'Tuve que aprender muchas cosas antes de poder usar Tivot.',
+] as const;
+
+export function PostPracticeSurveyModal({ isOpen, onSubmit, onSkip }: Props) {
+  const [answers, setAnswers] = useState<Record<string, LikertScore>>({});
   if (!isOpen) return null;
 
-  const questions = [
-    { key: 'tam_perceived_usefulness', text: '1. Tivot me ayudó a entender mejor cómo funciona la lógica de programación.' },
-    { key: 'tam_perceived_ease_of_use', text: '2. La interfaz y los controles de código fueron fáciles de usar.' },
-    { key: 'tam_ai_scaffolding', text: '3. Las explicaciones del tutor de IA fueron claras y acertadas.' },
-    { key: 'tam_ai_trust', text: '4. Confío en las sugerencias que me dio la Inteligencia Artificial.' },
-    { key: 'tam_intention_to_use', text: '5. Me gustaría volver a usar este tipo de software en otras materias.' }
-  ] as const;
+  const allKeys = [...tamQuestions.map(([key]) => key), ...susQuestions.map((_, index) => `sus_${index}`)];
+  const isComplete = allKeys.every((key) => answers[key] !== undefined);
+  const select = (key: string, value: LikertScore) => setAnswers((current) => ({ ...current, [key]: value }));
 
-  const handleSelect = (key: keyof SurveyAnswers, value: number) => {
-    setAnswers(prev => ({ ...prev, [key]: value }));
+  const submit = () => {
+    if (!isComplete) return;
+    onSubmit({
+      tam_perceived_usefulness: answers.tam_perceived_usefulness!,
+      tam_perceived_ease_of_use: answers.tam_perceived_ease_of_use!,
+      tam_ai_scaffolding: answers.tam_ai_scaffolding!,
+      tam_ai_trust: answers.tam_ai_trust!,
+      tam_intention_to_use: answers.tam_intention_to_use!,
+      sus: susQuestions.map((_, index) => answers[`sus_${index}`]!) as SurveyAnswers['sus'],
+    });
   };
 
-  const isComplete = questions.every(q => answers[q.key as keyof SurveyAnswers] !== undefined);
-
-  const handleSubmit = () => {
-    if (isComplete) {
-      onSubmit(answers as SurveyAnswers);
-    }
-  };
+  const renderQuestion = (key: string, text: string, number: number) => (
+    <div key={key} className="telemetry-question">
+      <div className="telemetry-question-text">{number}. {text}</div>
+      <div className="telemetry-likert" role="group" aria-label={text}>
+        {([1, 2, 3, 4, 5] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            className={`telemetry-likert-btn ${answers[key] === value ? 'selected' : ''}`}
+            aria-pressed={answers[key] === value}
+            onClick={() => select(key, value)}
+          >
+            {value}
+          </button>
+        ))}
+      </div>
+      <div className="telemetry-likert-labels"><span>Totalmente en desacuerdo</span><span>Totalmente de acuerdo</span></div>
+    </div>
+  );
 
   return (
     <div className="level-complete-backdrop">
-      <div className="telemetry-consent-modal telemetry-survey-modal">
-        <h2>¡Excelente trabajo!</h2>
-        <p>Para ayudarnos a mejorar, por favor responde estas breves preguntas sobre tu experiencia con Tivot.</p>
-        
+      <div className="telemetry-consent-modal telemetry-survey-modal" role="dialog" aria-modal="true" aria-labelledby="survey-title">
+        <h2 id="survey-title">Encuesta final TAM/SUS</h2>
+        <p>Responde del 1 al 5. Tus respuestas se vinculan únicamente con tu código anónimo.</p>
         <div className="telemetry-survey-questions">
-          {questions.map(q => (
-            <div key={q.key} className="telemetry-question">
-              <div className="telemetry-question-text">{q.text}</div>
-              <div className="telemetry-likert">
-                {[1, 2, 3, 4, 5].map(val => (
-                  <button
-                    key={val}
-                    className={`telemetry-likert-btn ${answers[q.key as keyof SurveyAnswers] === val ? 'selected' : ''}`}
-                    onClick={() => handleSelect(q.key as keyof SurveyAnswers, val)}
-                  >
-                    {val}
-                  </button>
-                ))}
-              </div>
-              <div className="telemetry-likert-labels">
-                <span>Totalmente en desacuerdo</span>
-                <span>Totalmente de acuerdo</span>
-              </div>
-            </div>
-          ))}
+          <h3>Percepción de utilidad y facilidad</h3>
+          {tamQuestions.map(([key, text], index) => renderQuestion(key, text, index + 1))}
+          <h3>Usabilidad del sistema (SUS)</h3>
+          {susQuestions.map((text, index) => renderQuestion(`sus_${index}`, text, index + 6))}
         </div>
-
-        <div className="telemetry-actions" style={{ flexDirection: 'row', width: '100%' }}>
-          <button 
-            className="complete-action tertiary" 
-            style={{ flex: 1 }}
-            onClick={onSkip}
-          >
-            Omitir encuesta
-          </button>
-          <button 
-            className="complete-action primary"
-            style={{ flex: 1, opacity: isComplete ? 1 : 0.5, cursor: isComplete ? 'pointer' : 'not-allowed' }}
-            disabled={!isComplete}
-            onClick={handleSubmit}
-          >
-            Enviar respuestas
-          </button>
+        <div className="telemetry-actions telemetry-survey-actions">
+          <button className="complete-action tertiary" onClick={onSkip}>Omitir</button>
+          <button className="complete-action primary" disabled={!isComplete} onClick={submit}>Enviar respuestas</button>
         </div>
       </div>
     </div>

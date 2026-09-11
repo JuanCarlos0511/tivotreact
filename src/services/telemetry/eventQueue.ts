@@ -1,95 +1,87 @@
-import type { TelemetryEvent, QueueStatus } from '../../types/telemetry';
+import type { QueueStatus, TelemetryEvent } from '../../types/telemetry';
+import { exportService } from './exportService';
 import { indexedDbStorage } from './indexedDbStorage';
 import { telemetryClient } from './telemetryClient';
-import { exportService } from './exportService';
+
+const BATCH_SIZE = 100;
+const FLUSH_THRESHOLD = 10;
+const BASE_RETRY_MS = 2_000;
+const MAX_RETRY_MS = 30_000;
 
 export class TelemetryEventQueue {
   private isEnabled = true;
   private isProcessing = false;
-  private retryDelayMs = 2000;
-  private maxRetryDelayMs = 30000;
+  private retryDelayMs = BASE_RETRY_MS;
   private timer: number | null = null;
   private syncedCount = 0;
   private failedCount = 0;
   private lastSyncAt: string | null = null;
 
   constructor() {
-    this.scheduleNextProcess();
+    window.addEventListener('online', this.handleOnline);
+    window.addEventListener('pagehide', this.handlePageHide);
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    this.schedule(10_000);
   }
 
-  setEnabled(enabled: boolean) {
+  setEnabled(enabled: boolean): void {
     this.isEnabled = enabled;
+    if (enabled) void this.flush();
   }
 
-  async enqueue(event: TelemetryEvent) {
+  async enqueue(event: TelemetryEvent): Promise<void> {
     if (!this.isEnabled) return;
     await indexedDbStorage.addEvent(event);
-    
-    const count = await indexedDbStorage.getEventCount();
-    const isCritical = ['LEVEL_COMPLETE', 'SESSION_START', 'SURVEY_SUBMITTED'].includes(event.event_type);
-    
-    if (count >= 10 || isCritical) {
-      this.flush();
-    }
+    const critical = ['session_started', 'level_completed', 'survey_submitted'].includes(event.event_type);
+    if (critical || await indexedDbStorage.getEventCount() >= FLUSH_THRESHOLD) void this.flush();
   }
 
-  async flush() {
-    if (this.timer) {
-      window.clearTimeout(this.timer);
-      this.timer = null;
-    }
-    await this.processBatch();
+  async flush(keepalive = false): Promise<void> {
+    if (this.timer !== null) window.clearTimeout(this.timer);
+    this.timer = null;
+    await this.processBatch(keepalive);
   }
 
-  private async processBatch() {
+  private readonly handleOnline = () => { void this.flush(); };
+  private readonly handlePageHide = () => { void this.flush(true); };
+  private readonly handleVisibilityChange = () => {
+    if (document.visibilityState === 'hidden') void this.flush(true);
+  };
+
+  private async processBatch(keepalive: boolean): Promise<void> {
     if (this.isProcessing || !this.isEnabled) return;
-    
     this.isProcessing = true;
     try {
-      const allEvents = await indexedDbStorage.getAllEvents();
-      if (allEvents.length === 0) {
-        this.isProcessing = false;
-        return;
-      }
-
-      const batch = allEvents.slice(0, 100);
-      const success = await telemetryClient.sendBatch(batch);
-      
-      if (success) {
-        await indexedDbStorage.removeEvents(batch.map(e => e.id));
+      const batch = (await indexedDbStorage.getAllEvents()).slice(0, BATCH_SIZE);
+      if (!batch.length) return;
+      if (await telemetryClient.sendBatch(batch, keepalive)) {
+        await indexedDbStorage.removeEvents(batch.map((event) => event.event_id));
         this.syncedCount += batch.length;
         this.lastSyncAt = new Date().toISOString();
-        this.retryDelayMs = 2000; // reset
-        
-        const remaining = await indexedDbStorage.getEventCount();
-        if (remaining > 0) {
-          this.scheduleNextProcess(100);
-        }
+        this.retryDelayMs = BASE_RETRY_MS;
+        if (await indexedDbStorage.getEventCount()) this.schedule(100);
       } else {
-        this.handleFailure();
+        this.registerFailure();
       }
     } catch {
-      this.handleFailure();
+      this.registerFailure();
     } finally {
       this.isProcessing = false;
+      if (this.timer === null) this.schedule(10_000);
     }
   }
 
-  private handleFailure() {
-    this.failedCount++;
-    this.retryDelayMs = Math.min(this.retryDelayMs * 2, this.maxRetryDelayMs);
-    const jitter = Math.random() * 1000;
-    this.scheduleNextProcess(this.retryDelayMs + jitter);
+  private registerFailure(): void {
+    this.failedCount += 1;
+    this.retryDelayMs = Math.min(this.retryDelayMs * 2, MAX_RETRY_MS);
+    this.schedule(this.retryDelayMs + Math.random() * 1_000);
   }
 
-  private scheduleNextProcess(delayMs = 10000) {
-    if (this.timer) window.clearTimeout(this.timer);
-    this.timer = window.setTimeout(async () => {
-      const count = await indexedDbStorage.getEventCount();
-      if (count > 0) {
-        await this.processBatch();
-      }
-      this.scheduleNextProcess(); // loop
+  private schedule(delayMs: number): void {
+    if (this.timer !== null) window.clearTimeout(this.timer);
+    this.timer = window.setTimeout(() => {
+      this.timer = null;
+      void this.processBatch(false);
     }, delayMs);
   }
 
@@ -98,20 +90,16 @@ export class TelemetryEventQueue {
       pending: await indexedDbStorage.getEventCount(),
       synced: this.syncedCount,
       failed: this.failedCount,
-      lastSyncAt: this.lastSyncAt
+      lastSyncAt: this.lastSyncAt,
     };
   }
 
-  async downloadAsCSV() {
-    const events = await indexedDbStorage.getAllEvents();
-    const csv = exportService.exportEventsAsCSV(events);
-    exportService.downloadFile(csv, `telemetry_export_${Date.now()}.csv`, 'text/csv');
+  async downloadAsCSV(): Promise<void> {
+    exportService.downloadFile(exportService.exportEventsAsCSV(await indexedDbStorage.getAllEvents()), `telemetry_export_${Date.now()}.csv`, 'text/csv');
   }
 
-  async downloadAsJSONL() {
-    const events = await indexedDbStorage.getAllEvents();
-    const jsonl = exportService.exportEventsAsJSONL(events);
-    exportService.downloadFile(jsonl, `telemetry_export_${Date.now()}.jsonl`, 'application/jsonl');
+  async downloadAsJSONL(): Promise<void> {
+    exportService.downloadFile(exportService.exportEventsAsJSONL(await indexedDbStorage.getAllEvents()), `telemetry_export_${Date.now()}.jsonl`, 'application/x-ndjson');
   }
 }
 

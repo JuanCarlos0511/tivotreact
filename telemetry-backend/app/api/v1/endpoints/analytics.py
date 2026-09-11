@@ -13,13 +13,13 @@ router = APIRouter(dependencies=[Depends(verify_admin_key)])
 
 @router.get("/overview")
 async def get_analytics_overview(
-    group_id: Optional[str] = Query(None),
+    condition: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """Resumen general de KPIs para el Dashboard del Investigador."""
     base_session_filter = [Session.has_assent.is_(True)]
-    if group_id and group_id != "Todos":
-        base_session_filter.append(Session.group_id == group_id)
+    if condition and condition != "Todos":
+        base_session_filter.append(Session.condition == condition)
 
     # Total participantes
     total_q = await db.execute(
@@ -43,14 +43,14 @@ async def get_analytics_overview(
     time_lvl1_q = await db.execute(
         select(func.avg(TelemetryEvent.active_time_ms))
         .join(Session, TelemetryEvent.session_id == Session.id)
-        .where(and_(*base_session_filter, TelemetryEvent.level_id == 1, TelemetryEvent.event_type == "LEVEL_COMPLETE"))
+        .where(and_(*base_session_filter, TelemetryEvent.level_id == 1, TelemetryEvent.event_type == "level_completed"))
     )
     avg_t1 = (time_lvl1_q.scalar_one() or 0) / 1000
 
     time_lvl4_q = await db.execute(
         select(func.avg(TelemetryEvent.active_time_ms))
         .join(Session, TelemetryEvent.session_id == Session.id)
-        .where(and_(*base_session_filter, TelemetryEvent.level_id == 4, TelemetryEvent.event_type == "LEVEL_COMPLETE"))
+        .where(and_(*base_session_filter, TelemetryEvent.level_id == 4, TelemetryEvent.event_type == "level_completed"))
     )
     avg_t4 = (time_lvl4_q.scalar_one() or 0) / 1000
 
@@ -70,14 +70,14 @@ async def get_analytics_overview(
         started_q = await db.execute(
             select(func.count(distinct(TelemetryEvent.participant_id)))
             .join(Session, TelemetryEvent.session_id == Session.id)
-            .where(and_(*base_session_filter, TelemetryEvent.level_id == lvl, TelemetryEvent.event_type == "LEVEL_START"))
+            .where(and_(*base_session_filter, TelemetryEvent.level_id == lvl, TelemetryEvent.event_type == "level_started"))
         )
         started = started_q.scalar_one() or 0
 
         done_q = await db.execute(
             select(func.count(distinct(TelemetryEvent.participant_id)))
             .join(Session, TelemetryEvent.session_id == Session.id)
-            .where(and_(*base_session_filter, TelemetryEvent.level_id == lvl, TelemetryEvent.event_type == "LEVEL_COMPLETE"))
+            .where(and_(*base_session_filter, TelemetryEvent.level_id == lvl, TelemetryEvent.event_type == "level_completed"))
         )
         done = done_q.scalar_one() or 0
         dropout_by_level[lvl] = round((1 - (done / started)) * 100, 1) if started > 0 else 0.0
@@ -97,13 +97,13 @@ async def get_analytics_overview(
 
 @router.get("/learning-curve")
 async def get_learning_curve(
-    group_id: Optional[str] = Query(None),
+    condition: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """Datos para la gráfica de curva de aprendizaje (tiempos e intentos por nivel)."""
     base_filter = [Session.has_assent.is_(True)]
-    if group_id and group_id != "Todos":
-        base_filter.append(Session.group_id == group_id)
+    if condition and condition != "Todos":
+        base_filter.append(Session.condition == condition)
 
     levels_data = []
     for lvl in range(1, 5):
@@ -120,7 +120,7 @@ async def get_learning_curve(
         times_q = await db.execute(
             select(TelemetryEvent.active_time_ms)
             .join(Session, TelemetryEvent.session_id == Session.id)
-            .where(and_(*base_filter, TelemetryEvent.level_id == lvl, TelemetryEvent.event_type == "LEVEL_COMPLETE", TelemetryEvent.active_time_ms.is_not(None)))
+            .where(and_(*base_filter, TelemetryEvent.level_id == lvl, TelemetryEvent.event_type == "level_completed", TelemetryEvent.active_time_ms.is_not(None)))
         )
         times_list = [(r[0] / 1000) for r in times_q.all() if r[0] is not None]
 
@@ -128,7 +128,7 @@ async def get_learning_curve(
         first_try_q = await db.execute(
             select(func.count(distinct(TelemetryEvent.participant_id)))
             .join(Session, TelemetryEvent.session_id == Session.id)
-            .where(and_(*base_filter, TelemetryEvent.level_id == lvl, TelemetryEvent.event_type == "LEVEL_COMPLETE", TelemetryEvent.attempt_number == 1))
+            .where(and_(*base_filter, TelemetryEvent.level_id == lvl, TelemetryEvent.event_type == "level_completed", TelemetryEvent.attempt_number == 1))
         )
         first_try_count = first_try_q.scalar_one() or 0
         total_finished = len(times_list)
@@ -149,13 +149,13 @@ async def get_learning_curve(
 
 @router.get("/scaffolding-efficacy")
 async def get_scaffolding_efficacy(
-    group_id: Optional[str] = Query(None),
+    condition: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """Eficacia de las pistas del tutor IA por tipo de asistencia."""
     base_filter = [Session.has_assent.is_(True), TelemetryEvent.ai_hint_type.is_not(None)]
-    if group_id and group_id != "Todos":
-        base_filter.append(Session.group_id == group_id)
+    if condition and condition != "Todos":
+        base_filter.append(Session.condition == condition)
 
     hint_types = ["Conceptual", "Corrección de Sintaxis", "Solución Directa"]
     results = []
@@ -189,13 +189,13 @@ async def get_scaffolding_efficacy(
 
 @router.get("/error-taxonomy")
 async def get_error_taxonomy(
-    group_id: Optional[str] = Query(None),
+    condition: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """Frecuencias acumuladas de taxonomía de errores en Tivot."""
     base_filter = [Session.has_assent.is_(True), TelemetryEvent.error_category.is_not(None)]
-    if group_id and group_id != "Todos":
-        base_filter.append(Session.group_id == group_id)
+    if condition and condition != "Todos":
+        base_filter.append(Session.condition == condition)
 
     q = await db.execute(
         select(TelemetryEvent.error_category, func.count(TelemetryEvent.id))
@@ -225,13 +225,13 @@ async def get_error_taxonomy(
 
 @router.get("/survey-summary")
 async def get_survey_summary(
-    group_id: Optional[str] = Query(None),
+    condition: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """Estadísticos descriptivos y frecuencias de la encuesta TAM y escala SUS."""
     base_filter = [Session.has_assent.is_(True)]
-    if group_id and group_id != "Todos":
-        base_filter.append(Session.group_id == group_id)
+    if condition and condition != "Todos":
+        base_filter.append(Session.condition == condition)
 
     q = await db.execute(
         select(SurveyResponse)
@@ -249,7 +249,9 @@ async def get_survey_summary(
 
     pu_vals = [s.tam_perceived_usefulness for s in surveys if s.tam_perceived_usefulness]
     peou_vals = [s.tam_perceived_ease_of_use for s in surveys if s.tam_perceived_ease_of_use]
+    scaffolding_vals = [s.tam_ai_scaffolding for s in surveys if s.tam_ai_scaffolding]
     trust_vals = [s.tam_ai_trust for s in surveys if s.tam_ai_trust]
+    intention_vals = [s.tam_intention_to_use for s in surveys if s.tam_intention_to_use]
     sus_vals = [s.sus_score for s in surveys if s.sus_score is not None]
 
     def summarize_metric(vals, label):
@@ -267,7 +269,9 @@ async def get_survey_summary(
         "tam": {
             "perceived_usefulness": summarize_metric(pu_vals, "Utilidad Percibida (TAM-PU)"),
             "perceived_ease_of_use": summarize_metric(peou_vals, "Facilidad de Uso (TAM-PEOU)"),
+            "ai_scaffolding": summarize_metric(scaffolding_vals, "Apoyo Percibido del Tutor IA"),
             "ai_trust": summarize_metric(trust_vals, "Confianza en el Tutor IA"),
+            "intention_to_use": summarize_metric(intention_vals, "Intención de Uso"),
         },
         "sus": {
             "mean": round(float(np.mean(sus_vals)), 1) if sus_vals else 0.0,
@@ -280,13 +284,13 @@ async def get_survey_summary(
 async def get_participants_list(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    group_id: Optional[str] = Query(None),
+    condition: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """Lista paginada de participantes anonimizados para el panel de investigación."""
     base_filter = []
-    if group_id and group_id != "Todos":
-        base_filter.append(Session.group_id == group_id)
+    if condition and condition != "Todos":
+        base_filter.append(Session.condition == condition)
 
     total_q = await db.execute(
         select(func.count(distinct(Session.participant_id))).where(and_(*base_filter) if base_filter else True)
@@ -313,7 +317,7 @@ async def get_participants_list(
         # Total active time
         time_q = await db.execute(
             select(func.sum(TelemetryEvent.active_time_ms)).where(
-                and_(TelemetryEvent.session_id == s.id, TelemetryEvent.event_type == "LEVEL_COMPLETE")
+                and_(TelemetryEvent.session_id == s.id, TelemetryEvent.event_type == "level_completed")
             )
         )
         total_time_ms = time_q.scalar_one() or 0
@@ -321,7 +325,7 @@ async def get_participants_list(
         # Total hints requested
         hints_q = await db.execute(
             select(func.count(TelemetryEvent.id)).where(
-                and_(TelemetryEvent.session_id == s.id, TelemetryEvent.event_type == "AI_HINT_REQUESTED")
+                and_(TelemetryEvent.session_id == s.id, TelemetryEvent.event_type == "ai_hint_requested")
             )
         )
         hints_count = hints_q.scalar_one() or 0
@@ -329,7 +333,7 @@ async def get_participants_list(
         items.append({
             "id": str(s.id),
             "participant_id": s.participant_id,
-            "group_id": s.group_id or "Sin Grupo",
+            "condition": s.condition,
             "has_assent": s.has_assent,
             "max_level": max_lvl,
             "total_active_time_s": round(total_time_ms / 1000, 1),

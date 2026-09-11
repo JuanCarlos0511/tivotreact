@@ -1,82 +1,87 @@
-import { useContext, useEffect, useRef } from 'react';
-import { TelemetryContext } from '../context/TelemetryContext';
-import type { ErrorCategory, AiHintType } from '../../../types/telemetry';
+import { useCallback, useContext, useEffect, useRef } from 'react';
+import type { AiHintType, ErrorCategory } from '../../../types/telemetry';
 import { IdleDetector } from '../../../services/telemetry/idleDetector';
+import { TelemetryContext } from '../context/TelemetryContext';
 
 export function useTelemetry() {
   const context = useContext(TelemetryContext);
-  
-  if (!context) {
-    throw new Error('useTelemetry must be used within a TelemetryProvider');
-  }
+  if (!context) throw new Error('useTelemetry must be used within a TelemetryProvider');
 
-  const { recordEvent, session, isPracticeMode, showSurvey, evaluateHintEffectiveness, recordHintRequest, isResearcherPanelOpen, openResearcher } = context;
-
-  // Set up idle detector for active level tracking
+  const { recordEvent, session, isPracticeMode, showSurvey, recordHintRequest, consumeHintEffectiveness, isResearcherPanelOpen, openResearcher } = context;
   const activeLevelRef = useRef<number | null>(null);
   const idleDetectorRef = useRef<IdleDetector | null>(null);
 
   useEffect(() => {
-    if (!isPracticeMode) {
-      idleDetectorRef.current = new IdleDetector(45000, (idleTimeMs) => {
-        if (activeLevelRef.current !== null) {
-          recordEvent('IDLE_PERIOD_DETECTED', activeLevelRef.current, { idle_time_ms: idleTimeMs });
-        }
-      });
-      idleDetectorRef.current.start();
-    }
-
-    return () => {
-      if (idleDetectorRef.current) {
-        idleDetectorRef.current.stop();
+    if (isPracticeMode) return;
+    const detector = new IdleDetector(45_000, (idleTimeMs) => {
+      if (activeLevelRef.current !== null) {
+        recordEvent('idle_detected', activeLevelRef.current, { idle_time_ms: idleTimeMs });
       }
-    };
+    });
+    idleDetectorRef.current = detector;
+    detector.start();
+    return () => detector.stop();
   }, [isPracticeMode, recordEvent]);
+
+  const recordLevelStart = useCallback((levelId: number) => {
+    activeLevelRef.current = levelId;
+    idleDetectorRef.current?.reset();
+    recordEvent('level_started', levelId);
+  }, [recordEvent]);
+
+  const recordLevelComplete = useCallback((levelId: number, attemptNumber: number, activeTimeMs: number) => {
+    activeLevelRef.current = null;
+    recordEvent('level_completed', levelId, { attempt_number: attemptNumber, active_time_ms: activeTimeMs });
+  }, [recordEvent]);
+
+  const recordCodeExecution = useCallback((
+    levelId: number,
+    attemptNumber: number,
+    isSuccess: boolean,
+    errorCategory?: ErrorCategory,
+    errorSnippet?: string,
+    codeSnapshot?: string,
+  ) => {
+    idleDetectorRef.current?.reset();
+    const hintEffect = consumeHintEffectiveness(levelId, isSuccess);
+    recordEvent(errorCategory === 'SYNTAX_ERROR' ? 'syntax_error' : 'code_run', levelId, {
+      attempt_number: attemptNumber,
+      is_success: isSuccess,
+      ...hintEffect,
+      ...(errorCategory ? { error_category: errorCategory } : {}),
+      ...(errorSnippet ? { error_message_snippet: errorSnippet } : {}),
+      ...(codeSnapshot ? { payload: { code: codeSnapshot } } : {}),
+    });
+  }, [consumeHintEffectiveness, recordEvent]);
+
+  const recordError = useCallback((levelId: number, errorCategory: ErrorCategory, errorSnippet?: string) => {
+    recordEvent(errorCategory === 'SYNTAX_ERROR' ? 'syntax_error' : 'code_run', levelId, {
+      is_success: false,
+      error_category: errorCategory,
+      ...(errorSnippet ? { error_message_snippet: errorSnippet } : {}),
+    });
+  }, [recordEvent]);
+
+  const recordAiHintRequested = useCallback((levelId: number, hintType: AiHintType) => {
+    idleDetectorRef.current?.reset();
+    recordHintRequest(levelId, hintType);
+  }, [recordHintRequest]);
+
+  const recordIdlePeriod = useCallback((levelId: number, idleTimeMs: number) => {
+    recordEvent('idle_detected', levelId, { idle_time_ms: idleTimeMs });
+  }, [recordEvent]);
 
   return {
     session,
     isPracticeMode,
-    
-    recordLevelStart: (levelId: number) => {
-      activeLevelRef.current = levelId;
-      if (idleDetectorRef.current) idleDetectorRef.current.reset();
-      recordEvent('LEVEL_START', levelId);
-    },
-    
-    recordLevelComplete: (levelId: number, attemptNumber: number, activeTimeMs: number) => {
-      activeLevelRef.current = null;
-      recordEvent('LEVEL_COMPLETE', levelId, { attempt_number: attemptNumber, active_time_ms: activeTimeMs });
-    },
-    
-    recordCodeExecution: (levelId: number, attemptNumber: number, isSuccess: boolean, errorCategory?: ErrorCategory, errorSnippet?: string) => {
-      if (idleDetectorRef.current) idleDetectorRef.current.reset();
-      recordEvent('CODE_EXECUTION_ATTEMPT', levelId, {
-        attempt_number: attemptNumber,
-        is_success: isSuccess,
-        ...(errorCategory !== undefined ? { error_category: errorCategory } : {}),
-        ...(errorSnippet !== undefined ? { error_message_snippet: errorSnippet } : {}),
-      });
-    },
-    
-    recordError: (levelId: number, errorCategory: ErrorCategory, errorSnippet?: string) => {
-      recordEvent('ERROR_ENCOUNTERED', levelId, {
-        error_category: errorCategory,
-        ...(errorSnippet !== undefined ? { error_message_snippet: errorSnippet } : {}),
-      });
-    },
-    
-    recordAiHintRequested: (levelId: number, hintType: AiHintType) => {
-      if (idleDetectorRef.current) idleDetectorRef.current.reset();
-      recordHintRequest(levelId, hintType);
-    },
-    
-    recordIdlePeriod: (levelId: number, idleTimeMs: number) => {
-      recordEvent('IDLE_PERIOD_DETECTED', levelId, { idle_time_ms: idleTimeMs });
-    },
-    
+    recordLevelStart,
+    recordLevelComplete,
+    recordCodeExecution,
+    recordError,
+    recordAiHintRequested,
+    recordIdlePeriod,
     showSurvey,
-    evaluateHintEffectiveness,
     isResearcherPanelOpen,
-    openResearcher
+    openResearcher,
   };
 }

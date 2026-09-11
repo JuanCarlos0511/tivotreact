@@ -1,33 +1,40 @@
 services:
-  api:
-    build: .
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
-    env_file:
-      - .env
-    networks:
-      - dokploy-network
-  db:
+  postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tivot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tivot_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-tivot_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tivot"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
       timeout: 5s
-      retries: 5
-    networks:
-      - dokploy-network
+      retries: 10
+    networks: [tivot_internal]
+
+  api:
+    build: .
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: tivot
-      POSTGRES_PASSWORD: tivot_secret
-      POSTGRES_DB: telemetry
+      PORT: 8000
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://tivot:tivot_secret@postgres:5432/tivot_db}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-change-me-in-production}
+      RESEARCHER_PASSWORD: ${RESEARCHER_PASSWORD:-change-me-in-production}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://localhost:8081}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${PORT:-8000}:8000"
+    networks: [tivot_internal]
 
 volumes:
   postgres_data:
 
 networks:
-  dokploy-network:
-    external: true # Comentar esto si se usa localmente sin dokploy
+  tivot_internal:
+    driver: bridge

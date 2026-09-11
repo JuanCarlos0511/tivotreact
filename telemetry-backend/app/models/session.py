@@ -11,10 +11,8 @@ class Session(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     participant_id: Mapped[str] = mapped_column(String(64), index=True)
-    group_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)
+    condition: Mapped[str] = mapped_column(String(64), index=True, default="standard")
     has_assent: Mapped[bool] = mapped_column(default=True)
-    screen_resolution: Mapped[Optional[str]] = mapped_column(String(32))
-    user_agent: Mapped[Optional[str]] = mapped_column(String(255))
     started_at: Mapped[datetime] = mapped_column(server_default=func.now())
     completed_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
