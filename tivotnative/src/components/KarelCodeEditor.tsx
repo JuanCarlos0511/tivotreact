@@ -53,7 +53,8 @@ const EMPTY_PROGRAM = 'iniciar-programa\nfinalizar-programa'
 const LOOP_NEON_COLORS = ['#22c55e', '#a855f7', '#eab308'] as const
 const LOOP_NEON_CORES = ['#67f59a', '#d8a4ff', '#ffe45c'] as const
 const LOOP_NEON_GLOWS = ['rgba(34, 197, 94, 0.72)', 'rgba(168, 85, 247, 0.70)', 'rgba(234, 179, 8, 0.72)'] as const
-const LOOP_NEON_BACKGROUNDS = ['#edfff3', '#faf4ff', '#fff9df'] as const
+const LOOP_ROW_BACKGROUNDS = ['#dcfce7', '#f3e8ff', '#fef3c7'] as const
+const LOOP_ACTIVE_BACKGROUNDS = ['#bbf7d0', '#e9d5ff', '#fde68a'] as const
 
 export function KarelCodeEditor(props: KarelCodeEditorProps) {
   const { metrics, code, onChange, isRunning, activeLineNumber, compileResult, executionError } = props
@@ -492,8 +493,10 @@ export function KarelCodeEditor(props: KarelCodeEditorProps) {
             onScroll={event => { viewport.current.offset = event.nativeEvent.contentOffset.y }}>
             {descriptions.map((line, index) => {
               const active = activeLineNumber === index + 1
-              const activeLoopDepth = props.activeLoops.filter(loop => index + 1 >= loop.lineNumber && index + 1 <= loop.endLineNumber).length
-              const inLoop = activeLoopDepth > 0
+              const containingActiveLoops = props.activeLoops.filter(loop =>
+                index + 1 >= loop.lineNumber && index + 1 <= loop.endLineNumber)
+              const deepestActiveLoop = containingActiveLoops.at(-1)
+              const activeLoopColorIndex = deepestActiveLoop ? getLoopColorIndex(deepestActiveLoop) : null
               const lineLoops = props.activeLoops.filter(loop => loop.lineNumber === index + 1)
               const activeLoopBoundaries = props.activeLoops.slice(0, LOOP_NEON_COLORS.length).map((loop, colorIndex) => ({
                 loop,
@@ -502,11 +505,16 @@ export function KarelCodeEditor(props: KarelCodeEditorProps) {
                 isEnd: loop.endLineNumber === index + 1,
               })).filter(boundary => boundary.isStart || boundary.isEnd)
               const invalid = hasError && errorLine === index + 1
-              const nestingStyle = line.fixed ? undefined
-                : line.depth >= 4 ? styles.nestingDepth4
-                : line.depth === 3 ? styles.nestingDepth3
-                : line.depth === 2 ? styles.nestingDepth2
-                : styles.nestingDepth1
+              const nestingColorIndex = Math.min(Math.max(line.depth - 1, 0), LOOP_ROW_BACKGROUNDS.length - 1)
+              const rowBackgroundColor = invalid
+                ? colors.errorBg
+                : activeLoopColorIndex !== null
+                  ? (active ? LOOP_ACTIVE_BACKGROUNDS[activeLoopColorIndex] : LOOP_ROW_BACKGROUNDS[activeLoopColorIndex])
+                  : active
+                    ? colors.successBg
+                    : line.fixed
+                      ? undefined
+                      : LOOP_ROW_BACKGROUNDS[nestingColorIndex]
               return (
                 <View key={index} style={styles.lineShell} onLayout={event => {
                   rowLayouts.current.set(index, event.nativeEvent.layout)
@@ -538,12 +546,10 @@ export function KarelCodeEditor(props: KarelCodeEditorProps) {
                     accessibilityLabel={'Seleccionar línea ' + (index + 1) + ': ' + line.text}
                     accessibilityState={{ selected: selectedLine === index }}
                     onPress={() => select(index)}
-                    style={[styles.line, nestingStyle, line.fixed && !portrait && styles.fixedLine,
-                      inLoop && styles.loopLine, activeLoopDepth === 2 && styles.loopLineDepth2, activeLoopDepth >= 3 && styles.loopLineDepth3,
+                    style={[styles.line, line.fixed && !portrait && styles.fixedLine,
                       selectedLine === index && styles.selectedLine,
-                      active && styles.activeLine, active && activeLoopDepth === 1 && styles.loopLineDepth1Active,
-                      active && activeLoopDepth === 2 && styles.loopLineDepth2Active,
-                      active && activeLoopDepth >= 3 && styles.loopLineDepth3Active, invalid && styles.invalidLine]}>
+                      active && styles.activeLine, invalid && styles.invalidLine,
+                      rowBackgroundColor ? { backgroundColor: rowBackgroundColor } : undefined]}>
                   <View style={styles.lineNumber}>
                     <Text style={[styles.lineNumberText, active && styles.activeNumber]}>{index + 1}</Text>
                     {active && <PlayArrow size={8} color={colors.accentStrong} />}
@@ -561,7 +567,7 @@ export function KarelCodeEditor(props: KarelCodeEditorProps) {
                             style={[styles.lineLoopBadge, {
                               borderColor: LOOP_NEON_COLORS[colorIndex]!,
                               color: LOOP_NEON_COLORS[colorIndex]!,
-                              backgroundColor: LOOP_NEON_BACKGROUNDS[colorIndex]!,
+                              backgroundColor: LOOP_ROW_BACKGROUNDS[colorIndex]!,
                             }]}>
                             {loop.iteration}/{loop.total ?? '∞'}
                           </Text>
@@ -674,16 +680,6 @@ const styles = StyleSheet.create({
   lineContent: { gap: 5, padding: 2 },
   lineShell: { position: 'relative', overflow: 'visible' },
   line: { zIndex: 1, minHeight: 40, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.line, borderRadius: 7, backgroundColor: colors.panelRaised },
-  loopLine: { backgroundColor: '#d9f6e7' },
-  loopLineDepth2: { backgroundColor: '#f0e6ff' },
-  loopLineDepth3: { backgroundColor: '#fff3c4' },
-  loopLineDepth1Active: { backgroundColor: '#c5efd9' },
-  loopLineDepth2Active: { backgroundColor: '#dfc8fb' },
-  loopLineDepth3Active: { backgroundColor: '#ffeba0' },
-  nestingDepth1: { backgroundColor: '#eaf8ef' },
-  nestingDepth2: { backgroundColor: '#e3f7f4' },
-  nestingDepth3: { backgroundColor: '#e8f3fa' },
-  nestingDepth4: { backgroundColor: '#fff5cf' },
   loopNeonBoundaries: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 0, overflow: 'visible' },
   loopNeonStroke: { position: 'absolute', height: 2, borderRadius: 1 },
   loopNeonStrokeTop: { top: -1 },
