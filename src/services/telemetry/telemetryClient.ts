@@ -1,15 +1,27 @@
 import type { TelemetryEvent, SurveyAnswers, TelemetrySession } from '../../types/telemetry';
 
-const API_URL = import.meta.env.VITE_TELEMETRY_API_URL || '';
+const RAW_API_URL = (import.meta.env.VITE_TELEMETRY_API_URL || '').trim().replace(/\/+$/, '');
+const CLIENT_KEY = (import.meta.env.VITE_TELEMETRY_CLIENT_KEY || '').trim();
+
+function buildUrl(endpoint: string): string {
+  if (!RAW_API_URL) return '';
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  if (RAW_API_URL.endsWith('/api/v1') && cleanEndpoint.startsWith('/api/v1/')) {
+    return `${RAW_API_URL}${cleanEndpoint.slice(7)}`;
+  }
+  return `${RAW_API_URL}${cleanEndpoint}`;
+}
 
 export class TelemetryClient {
   private async request<T>(endpoint: string, method: string, data: unknown): Promise<T | null> {
-    if (!API_URL) return null;
+    const fullUrl = buildUrl(endpoint);
+    if (!fullUrl) return null;
     try {
-      const response = await fetch(`${API_URL}${endpoint}`, {
+      const response = await fetch(fullUrl, {
         method,
         headers: {
           'Content-Type': 'application/json',
+          ...(CLIENT_KEY ? { 'X-Telemetry-Client-Key': CLIENT_KEY } : {}),
         },
         body: JSON.stringify(data),
       });
@@ -28,7 +40,7 @@ export class TelemetryClient {
   }
 
   async sendBatch(events: TelemetryEvent[]): Promise<boolean> {
-    if (!API_URL) return false;
+    if (!RAW_API_URL) return false;
     try {
       await this.request('/api/v1/telemetry/batch', 'POST', { events });
       return true;
@@ -38,7 +50,7 @@ export class TelemetryClient {
   }
 
   async submitSurvey(data: SurveyAnswers & { session_id: string; participant_id?: string; raw_answers?: Record<string, unknown> | SurveyAnswers }): Promise<boolean> {
-    if (!API_URL) return false;
+    if (!RAW_API_URL) return false;
     try {
       await this.request('/api/v1/telemetry/survey', 'POST', data);
       return true;
