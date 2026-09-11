@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional, Any
-from sqlalchemy import String, ForeignKey, func, Integer, Boolean, Float
+from sqlalchemy import String, ForeignKey, func, Integer, Boolean, Float, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.types import JSON
@@ -13,7 +13,11 @@ class TelemetryEvent(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sessions.id"), index=True)
-    participant_id: Mapped[str] = mapped_column(String(64), index=True)
+    participant_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("participants.anonymous_code", ondelete="RESTRICT"),
+        index=True,
+    )
     level_id: Mapped[int] = mapped_column(Integer, index=True)
     step_index: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     event_type: Mapped[str] = mapped_column(String(64), index=True)
@@ -31,6 +35,9 @@ class TelemetryEvent(Base):
     autonomy_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     
     payload: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
 
     session: Mapped["Session"] = relationship("Session", back_populates="events")

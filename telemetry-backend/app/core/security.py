@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import secrets
 import jwt
 from fastapi import HTTPException, Security, Depends
 from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
@@ -7,7 +8,22 @@ from starlette.status import HTTP_401_UNAUTHORIZED
 from .config import settings
 
 api_key_header = APIKeyHeader(name="X-Admin-Key", auto_error=False)
+telemetry_key_header = APIKeyHeader(name="X-Telemetry-Client-Key", auto_error=False)
 security_bearer = HTTPBearer(auto_error=False)
+
+
+async def verify_telemetry_client_key(
+    client_key: str | None = Security(telemetry_key_header),
+) -> None:
+    """Valida la clave de ingesta cuando el despliegue decide configurarla."""
+    expected = settings.TELEMETRY_CLIENT_KEY
+    if not expected:
+        return
+    if not client_key or not secrets.compare_digest(client_key, expected):
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Clave de telemetría inválida o ausente",
+        )
 
 def verify_researcher_password(password: str) -> bool:
     """Valida la contraseña contra la clave de investigador o la API key de admin."""

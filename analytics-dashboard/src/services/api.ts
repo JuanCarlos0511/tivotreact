@@ -86,17 +86,17 @@ class ApiService {
 
   async getScaffoldingEfficacy(condition?: string): Promise<ScaffoldingItem[]> {
     const query = condition && condition !== 'Todos' ? `?condition=${encodeURIComponent(condition)}` : '';
-    return this.request<ScaffoldingItem[]>(`/analytics/scaffolding-efficacy${query}`);
+    return this.request<ScaffoldingItem[]>(`/analytics/scaffolding${query}`);
   }
 
   async getErrorTaxonomy(condition?: string): Promise<ErrorTaxonomy> {
     const query = condition && condition !== 'Todos' ? `?condition=${encodeURIComponent(condition)}` : '';
-    return this.request<ErrorTaxonomy>(`/analytics/error-taxonomy${query}`);
+    return this.request<ErrorTaxonomy>(`/analytics/errors${query}`);
   }
 
   async getSurveySummary(condition?: string): Promise<SurveySummary> {
     const query = condition && condition !== 'Todos' ? `?condition=${encodeURIComponent(condition)}` : '';
-    return this.request<SurveySummary>(`/analytics/survey-summary${query}`);
+    return this.request<SurveySummary>(`/analytics/surveys${query}`);
   }
 
   async getParticipants(page = 1, pageSize = 20, condition?: string): Promise<ParticipantsResponse> {
@@ -114,7 +114,7 @@ class ApiService {
 
     switch (format) {
       case 'csv_flat':
-        endpoint = '/export/csv?type=flat_events';
+        endpoint = '/analytics/export?format=csv';
         defaultFilename = 'telemetry_events.csv';
         break;
       case 'csv_summary':
@@ -122,7 +122,7 @@ class ApiService {
         defaultFilename = 'student_metrics_summary.csv';
         break;
       case 'jsonl':
-        endpoint = '/export/jsonl';
+        endpoint = '/analytics/export?format=jsonl';
         defaultFilename = 'telemetry_data.jsonl';
         break;
       case 'xlsx':

@@ -66,6 +66,13 @@ class TelemetryBatchResponse(BaseModel):
     stored: int
 
 
+TelemetryEventList = Annotated[
+    list[TelemetryEventCreate],
+    Field(min_length=1, max_length=100),
+]
+TelemetryEventsRequest = TelemetryEventCreate | TelemetryBatchRequest | TelemetryEventList
+
+
 class SurveyCreate(BaseModel):
     session_id: uuid.UUID
     participant_id: ParticipantId | None = None

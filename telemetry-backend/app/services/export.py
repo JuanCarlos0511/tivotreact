@@ -23,7 +23,7 @@ async def get_export_query(db: AsyncSession):
         select(TelemetryEvent, Session, SurveyResponse)
         .join(Session, TelemetryEvent.session_id == Session.id)
         .outerjoin(SurveyResponse, Session.id == SurveyResponse.session_id)
-        .order_by(TelemetryEvent.created_at.asc())
+        .order_by(TelemetryEvent.timestamp.asc())
     )
     return await db.stream(stmt)
 
@@ -57,7 +57,7 @@ async def stream_csv(db: AsyncSession) -> AsyncGenerator[str, None]:
             event.ai_hint_type,
             event.ai_hint_effective,
             event.autonomy_score,
-            event.created_at.isoformat(),
+            event.timestamp.isoformat(),
             session.has_assent,
             survey.sus_score if survey else None,
             survey.tam_perceived_usefulness if survey else None,
@@ -89,7 +89,7 @@ async def stream_jsonl(db: AsyncSession) -> AsyncGenerator[str, None]:
             "ai_hint_type": event.ai_hint_type,
             "ai_hint_effective": event.ai_hint_effective,
             "autonomy_score": event.autonomy_score,
-            "timestamp": event.created_at.isoformat(),
+            "timestamp": event.timestamp.isoformat(),
             "has_assent": session.has_assent,
             "sus_score": survey.sus_score if survey else None,
             "tam_perceived_usefulness": survey.tam_perceived_usefulness if survey else None,
@@ -99,3 +99,15 @@ async def stream_jsonl(db: AsyncSession) -> AsyncGenerator[str, None]:
             "tam_intention_to_use": survey.tam_intention_to_use if survey else None
         }
         yield json.dumps(data) + "\n"
+
+
+async def stream_json(db: AsyncSession) -> AsyncGenerator[str, None]:
+    """Exporta el mismo dataset como un arreglo JSON válido sin cargarlo en memoria."""
+    yield "["
+    first = True
+    async for line in stream_jsonl(db):
+        if not first:
+            yield ","
+        yield line.rstrip("\n")
+        first = False
+    yield "]"

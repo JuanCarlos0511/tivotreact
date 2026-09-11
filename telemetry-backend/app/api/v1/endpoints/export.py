@@ -11,7 +11,7 @@ from app.api.deps import get_db, verify_admin_key
 from app.models.session import Session
 from app.models.event import TelemetryEvent
 from app.models.survey import SurveyResponse
-from app.services.export import stream_csv, stream_jsonl
+from app.services.export import stream_csv, stream_json, stream_jsonl
 
 router = APIRouter(dependencies=[Depends(verify_admin_key)])
 
@@ -128,6 +128,16 @@ async def export_jsonl(db: AsyncSession = Depends(get_db)):
         headers={"Content-Disposition": "attachment; filename=telemetry_data.jsonl"},
     )
 
+
+@router.get("/json")
+async def export_json(db: AsyncSession = Depends(get_db)):
+    """Descarga los eventos como un arreglo JSON estándar."""
+    return StreamingResponse(
+        stream_json(db),
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=telemetry_data.json"},
+    )
+
 @router.get("/xlsx")
 async def export_xlsx(db: AsyncSession = Depends(get_db)):
     """Descarga de dataset científico estructurado en Excel (4 hojas)."""
@@ -163,7 +173,7 @@ async def export_xlsx(db: AsyncSession = Depends(get_db)):
     events_q = await db.execute(
         select(TelemetryEvent)
         .where(TelemetryEvent.event_type.in_(["level_completed", "code_run", "syntax_error"]))
-        .order_by(TelemetryEvent.created_at.asc())
+        .order_by(TelemetryEvent.timestamp.asc())
     )
     events = events_q.scalars().all()
     for e in events:
@@ -181,14 +191,14 @@ async def export_xlsx(db: AsyncSession = Depends(get_db)):
     hints_q = await db.execute(
         select(TelemetryEvent)
         .where(TelemetryEvent.event_type == "ai_hint_requested")
-        .order_by(TelemetryEvent.created_at.asc())
+        .order_by(TelemetryEvent.timestamp.asc())
     )
     hints = hints_q.scalars().all()
     for h in hints:
         ws3.append([
             h.participant_id, h.level_id, h.ai_hint_type or "N/A",
             "Sí" if h.ai_hint_effective else ("No" if h.ai_hint_effective is False else "Pendiente"),
-            h.created_at.strftime("%Y-%m-%d %H:%M:%S") if h.created_at else "",
+            h.timestamp.strftime("%Y-%m-%d %H:%M:%S") if h.timestamp else "",
         ])
 
     # Sheet 4: Encuesta TAM SUS

@@ -54,6 +54,12 @@ El contenedor del backend ejecuta `alembic upgrade head` antes de iniciar FastAP
 
 La telemetría utiliza IDs anónimos, una cola persistente offline-first e ingesta idempotente. No se envían nombre, correo, IP, agente de usuario ni resolución de pantalla.
 
+La ingesta principal está disponible en `POST /api/v1/telemetry/events` y admite
+un evento, una lista o `{ "events": [...] }`; `/telemetry/batch` se conserva por
+compatibilidad. Las analíticas requieren autenticación de investigador. Si se
+configura una clave de cliente, `TELEMETRY_CLIENT_KEY` y
+`VITE_TELEMETRY_CLIENT_KEY` deben tener el mismo valor.
+
 ## IA
 
 El proveedor se configura con las variables `VITE_AI_*` y `VITE_QWEN_*` descritas en `.env.example`.

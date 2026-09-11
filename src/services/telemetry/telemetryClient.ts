@@ -46,7 +46,7 @@ export class TelemetryClient {
 
   async sendBatch(events: TelemetryEvent[], keepalive = false): Promise<boolean> {
     if (!RAW_API_URL) return false;
-    return (await this.request('/api/v1/telemetry/batch', { events }, keepalive)) !== null;
+    return (await this.request('/api/v1/telemetry/events', { events }, keepalive)) !== null;
   }
 
   async submitSurvey(

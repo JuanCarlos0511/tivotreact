@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, distinct, and_, case
-from typing import Optional, List
+from typing import Literal, Optional, List
 import numpy as np
 
 from app.api.deps import get_db, verify_admin_key
 from app.models.session import Session
 from app.models.event import TelemetryEvent
 from app.models.survey import SurveyResponse
+from app.services.export import stream_csv, stream_json, stream_jsonl
 
 router = APIRouter(dependencies=[Depends(verify_admin_key)])
 
@@ -147,6 +149,7 @@ async def get_learning_curve(
 
     return levels_data
 
+@router.get("/scaffolding")
 @router.get("/scaffolding-efficacy")
 async def get_scaffolding_efficacy(
     condition: Optional[str] = Query(None),
@@ -187,6 +190,7 @@ async def get_scaffolding_efficacy(
 
     return results
 
+@router.get("/errors")
 @router.get("/error-taxonomy")
 async def get_error_taxonomy(
     condition: Optional[str] = Query(None),
@@ -223,6 +227,7 @@ async def get_error_taxonomy(
 
     return {"total_errors": total_errors, "categories": taxonomy}
 
+@router.get("/surveys")
 @router.get("/survey-summary")
 async def get_survey_summary(
     condition: Optional[str] = Query(None),
@@ -349,3 +354,28 @@ async def get_participants_list(
         "total_pages": int(np.ceil(total / page_size)) if total > 0 else 1,
         "items": items,
     }
+
+
+@router.get("/export")
+async def export_analytics_dataset(
+    format: Literal["csv", "json", "jsonl"] = Query("csv"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Punto único de exportación CSV/JSON para integraciones externas."""
+    if format == "json":
+        return StreamingResponse(
+            stream_json(db),
+            media_type="application/json",
+            headers={"Content-Disposition": "attachment; filename=telemetry_data.json"},
+        )
+    if format == "jsonl":
+        return StreamingResponse(
+            stream_jsonl(db),
+            media_type="application/x-ndjson",
+            headers={"Content-Disposition": "attachment; filename=telemetry_data.jsonl"},
+        )
+    return StreamingResponse(
+        stream_csv(db),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=telemetry_events.csv"},
+    )
