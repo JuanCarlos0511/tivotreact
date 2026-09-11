@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useEffect, useRef } from 'react'
+import { type CSSProperties, type FocusEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { Loader2, MessageCircle, RotateCcw, Send, X } from 'lucide-react'
 import type { TivotChatSession } from '@shared/types'
 import { ChatMessageItem } from './ChatMessageItem'
@@ -45,6 +45,8 @@ export function FloatingChatDrawer({
   onResetConversation,
 }: FloatingChatDrawerProps) {
   const messageEndRef = useRef<HTMLDivElement | null>(null)
+  const [isComposerFocused, setIsComposerFocused] = useState(false)
+  const [keyboardViewport, setKeyboardViewport] = useState<{ height: number; offsetTop: number } | null>(null)
   const latestAssistantMessageId = [...(session?.messages ?? [])].reverse().find((message) => message.role === 'assistant')?.id
   const showIntroAttention = isIntroPrompt && showObjective && !isOpen
 
@@ -61,6 +63,28 @@ export function FloatingChatDrawer({
     if (!isOpen) return
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [isOpen, isResponding, session?.messages.length])
+
+  useEffect(() => {
+    if (!isOpen || !isComposerFocused || !window.visualViewport) {
+      setKeyboardViewport(null)
+      return
+    }
+
+    const viewport = window.visualViewport
+    const updateViewport = () => setKeyboardViewport({ height: viewport.height, offsetTop: viewport.offsetTop })
+    updateViewport()
+    viewport.addEventListener('resize', updateViewport)
+    viewport.addEventListener('scroll', updateViewport)
+    return () => {
+      viewport.removeEventListener('resize', updateViewport)
+      viewport.removeEventListener('scroll', updateViewport)
+    }
+  }, [isOpen, isComposerFocused])
+
+  const handleComposerBlur = (event: FocusEvent<HTMLTextAreaElement>) => {
+    if (event.relatedTarget instanceof Node && event.currentTarget.parentElement?.contains(event.relatedTarget)) return
+    setIsComposerFocused(false)
+  }
 
   const handleOpen = () => {
     handleDismissPrompt()
@@ -108,7 +132,14 @@ export function FloatingChatDrawer({
         </button>
       </div>
       {isOpen && (
-          <section className="workspace-chat-panel" aria-label="Chat tutor de Karel">
+          <section
+            className={`workspace-chat-panel ${isComposerFocused ? 'chat-keyboard-open' : ''}`}
+            style={keyboardViewport ? {
+              '--chat-keyboard-height': `${keyboardViewport.height}px`,
+              '--chat-keyboard-top': `${keyboardViewport.offsetTop}px`,
+            } as CSSProperties : undefined}
+            aria-label="Chat tutor de Karel"
+          >
             <header className="floating-chat-header">
               <div>
                 <span>Tutor IA</span>
@@ -163,6 +194,8 @@ export function FloatingChatDrawer({
                 value={query}
                 onChange={(event) => onQueryChange(event.target.value)}
                 onKeyDown={handleKeyDown}
+                onFocus={() => setIsComposerFocused(true)}
+                onBlur={handleComposerBlur}
                 aria-describedby="chat-privacy-notice"
                 placeholder="Pregunta sobre tu codigo..."
                 rows={2}

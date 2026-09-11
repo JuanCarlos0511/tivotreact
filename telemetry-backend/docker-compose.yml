@@ -26,6 +26,11 @@ services:
       RESEARCHER_PASSWORD: ${RESEARCHER_PASSWORD:-change-me-in-production}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://localhost:8081}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      QWEN_API_URL: ${QWEN_API_URL:-https://dashscope-intl.aliyuncs.com/compatible-mode/v1}
+      QWEN_API_KEY: ${QWEN_API_KEY:-}
+      QWEN_MODEL: ${QWEN_MODEL:-qwen-plus}
+      QWEN_TIMEOUT_SECONDS: ${QWEN_TIMEOUT_SECONDS:-30}
     depends_on:
       postgres:
         condition: service_healthy

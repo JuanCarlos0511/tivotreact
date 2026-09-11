@@ -67,4 +67,7 @@ configura una clave de cliente, `TELEMETRY_CLIENT_KEY` y
 
 ## IA
 
-El proveedor se configura con las variables `VITE_AI_*` y `VITE_QWEN_*` descritas en `.env.example`.
+El frontend selecciona Qwen con `VITE_AI_PROVIDER=qwen` y llama al endpoint propio
+`/api/v1/ai/chat/completions`. La credencial nunca se compila en Vite: se configura
+exclusivamente en el backend mediante `QWEN_API_KEY`, junto con `QWEN_API_URL` y
+`QWEN_MODEL`, como se documenta en `.env.example`.

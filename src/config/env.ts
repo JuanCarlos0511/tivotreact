@@ -6,9 +6,7 @@ const envSchema = z.object({
   VITE_AI_MODEL_NAME: z.string().default('gemini-1.5-flash'),
   VITE_AI_TIMEOUT_MS: z.coerce.number().positive().default(15000),
   VITE_AI_TEMPERATURE: z.coerce.number().min(0).max(1).default(0.4),
-  VITE_QWEN_API_KEY: z.string().default(''),
-  VITE_QWEN_BASE_URL: z.string().url().default('https://dashscope-intl.aliyuncs.com/compatible-mode/v1'),
-  VITE_QWEN_MODEL: z.string().default('qwen-plus'),
+  VITE_API_URL: z.string().url().default('http://localhost:8000/api/v1'),
 })
 
 export const env = envSchema.parse(import.meta.env)

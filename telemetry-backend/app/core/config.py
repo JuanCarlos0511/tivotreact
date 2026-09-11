@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:3001,http://localhost:8080,http://localhost:8081,https://tivot.tudominio.com,https://analytics.tudominio.com"
     LOG_LEVEL: str = "INFO"
+    QWEN_API_URL: str = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+    QWEN_API_KEY: str = ""
+    QWEN_MODEL: str = "qwen-plus"
+    QWEN_TIMEOUT_SECONDS: float = 30.0
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -25,7 +29,11 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> List[str]:
-        """Obtiene la lista de orígenes CORS."""
-        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+        """Obtiene orígenes CORS canónicos, sin la barra final."""
+        return [
+            origin.strip().rstrip("/")
+            for origin in self.CORS_ORIGINS.split(",")
+            if origin.strip().rstrip("/")
+        ]
 
 settings = Settings()

@@ -2408,7 +2408,7 @@ button { cursor: pointer; }
 .start-title { color: var(--text); }
 .level-select-screen { width: min(820px, 100%); }
 .level-card, .arena-card { background: var(--panel-bg); border-color: var(--line); }
-.level-card-topline, .workspace-level-badge, .arena-eyebrow { color: var(--accent-ink); }
+.level-card-topline, .workspace-level-badge, .arena-level-number, .arena-eyebrow { color: var(--accent-ink); }
 .level-start-action { gap: 7px; margin-top: 18px; padding: 8px 12px; border-radius: 6px; color: #ffffff; background: #08734f; font-size: 12px; font-weight: 900; }
 .level-card .level-start-action { margin-top: auto; align-self: stretch; justify-content: center; }
 .arena-eyebrow { margin: 0; font-size: 18px; }

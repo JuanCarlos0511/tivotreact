@@ -153,6 +153,17 @@
     border-radius: 0;
     box-shadow: none;
   }
+  .workspace-chat-panel.chat-keyboard-open {
+    position: fixed;
+    top: var(--chat-keyboard-top, 0);
+    right: 0;
+    bottom: auto;
+    left: 0;
+    z-index: 40;
+    width: 100%;
+    height: var(--chat-keyboard-height, 100dvh);
+    max-height: none;
+  }
   .floating-chat-composer textarea {
     font-size: 16px;
   }

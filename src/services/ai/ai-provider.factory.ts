@@ -8,16 +8,8 @@ import { QwenAdapter } from './qwen.adapter'
 
 export const createAiProvider = (): AiProvider => {
   const config = resolveRuntimeConfig()
-  const hasQwenApiKey = env.VITE_QWEN_API_KEY.trim().length > 0
-
-  if (config.provider === 'qwen' || hasQwenApiKey) {
-    return new QwenAdapter({
-      ...config,
-      provider: 'qwen',
-      apiKey: env.VITE_QWEN_API_KEY.trim(),
-      baseUrl: env.VITE_QWEN_BASE_URL,
-      modelName: env.VITE_QWEN_MODEL,
-    })
+  if (config.provider === 'qwen') {
+    return new QwenAdapter(config)
   }
 
   if (config.provider === 'ollama') {
@@ -32,7 +24,7 @@ export const createAiProvider = (): AiProvider => {
     return new GeminiAdapter(config)
   }
 
-  throw new Error(`No hay un proveedor IA real configurado para "${config.provider}". Configura VITE_AI_PROVIDER=qwen y VITE_QWEN_API_KEY.`)
+  throw new Error(`No hay un proveedor IA real configurado para "${config.provider}".`)
 }
 
 const resolveRuntimeConfig = (): AiProviderRuntimeConfig => {
@@ -40,9 +32,9 @@ const resolveRuntimeConfig = (): AiProviderRuntimeConfig => {
 
   return {
     provider,
-    apiKey: provider === 'qwen' ? env.VITE_QWEN_API_KEY.trim() : '',
-    baseUrl: provider === 'qwen' ? env.VITE_QWEN_BASE_URL : env.VITE_AI_BASE_URL,
-    modelName: provider === 'qwen' ? env.VITE_QWEN_MODEL : env.VITE_AI_MODEL_NAME,
+    apiKey: '',
+    baseUrl: (provider === 'qwen' ? env.VITE_API_URL : env.VITE_AI_BASE_URL).replace(/\/+$/, ''),
+    modelName: env.VITE_AI_MODEL_NAME,
     timeoutMs: env.VITE_AI_TIMEOUT_MS,
     temperature: env.VITE_AI_TEMPERATURE,
   }

@@ -78,6 +78,7 @@ type KarelTutorialFocus = 'quickCommands' | 'code' | 'runner' | 'reset' | null;
 
 const COMMAND_GROUPS = ['Movimiento', 'Fichas', 'Control', 'Mis instrucciones'] as const;
 const SPEEDS: KarelSpeedMultiplier[] = [1, 1.5, 2, 0.5];
+const LOOP_NEON_LEVELS = 3;
 const EMPTY_PROGRAM = 'iniciar-programa\nfinalizar-programa';
 
 export function KarelCodeEditor({
@@ -607,6 +608,12 @@ export function KarelCodeEditor({
               const activeLoopDepth = activeLoops.filter(loop => index + 1 >= loop.lineNumber && index + 1 <= loop.endLineNumber).length;
               const inLoop = activeLoopDepth > 0;
               const lineLoops = activeLoops.filter(loop => loop.lineNumber === index + 1);
+              const activeLoopBoundaries = activeLoops.slice(0, LOOP_NEON_LEVELS).map((loop, colorIndex) => ({
+                loop,
+                colorIndex,
+                isStart: loop.lineNumber === index + 1,
+                isEnd: loop.endLineNumber === index + 1,
+              })).filter(boundary => boundary.isStart || boundary.isEnd);
               const invalid = hasError && errorLine === index + 1;
               return (
                 <li
@@ -616,6 +623,20 @@ export function KarelCodeEditor({
                   tabIndex={-1}
                   onClick={isMobile ? () => selectLine(index) : undefined}
                 >
+                  {activeLoopBoundaries.length > 0 && (
+                    <span className="loop-neon-boundaries" aria-hidden="true">
+                      {activeLoopBoundaries.map(({ loop, colorIndex, isStart, isEnd }) => (
+                        <span
+                          className={`loop-neon-boundary loop-neon-${colorIndex}`}
+                          key={`${loop.lineNumber}-${loop.endLineNumber}`}
+                          style={{ insetInline: `${14 + colorIndex * 10}px` }}
+                        >
+                          {isStart && <i className="loop-neon-stroke loop-neon-stroke-top" />}
+                          {isEnd && <i className="loop-neon-stroke loop-neon-stroke-bottom" />}
+                        </span>
+                      ))}
+                    </span>
+                  )}
                   <span className="code-line-number" aria-hidden="true">
                     {index + 1}
                     {active && <PlayArrow size={8} />}
@@ -643,11 +664,14 @@ export function KarelCodeEditor({
                     {lines[index]?.trimStart() || 'Línea vacía'}
                   </span>
                   <div className="code-line-end">
-                    {lineLoops.map((loop, loopIndex) => (
-                      <span className="loop-progress" key={`${loop.lineNumber}-${loopIndex}`} aria-label={`Iteración ${loop.iteration} de ${loop.total ?? 'sin límite definido'}`}>
+                    {lineLoops.map((loop, loopIndex) => {
+                      const colorIndex = Math.min(Math.max(0, activeLoops.findIndex(activeLoop =>
+                        activeLoop.lineNumber === loop.lineNumber && activeLoop.endLineNumber === loop.endLineNumber,
+                      )), LOOP_NEON_LEVELS - 1);
+                      return <span className={`loop-progress loop-neon-${colorIndex}`} key={`${loop.lineNumber}-${loopIndex}`} aria-label={`Iteración ${loop.iteration} de ${loop.total ?? 'sin límite definido'}`}>
                         {loop.iteration}/{loop.total ?? '∞'}
-                      </span>
-                    ))}
+                      </span>;
+                    })}
                   </div>
                 </li>
               );
