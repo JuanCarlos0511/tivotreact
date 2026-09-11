@@ -13,6 +13,8 @@ import { useTivotAiContext } from '../hooks/use-tivot-ai-context'
 import { FloatingChatDrawer } from './FloatingChatDrawer'
 import { ChallengeExitDialog, LevelCompletionOverlay } from '@features/karel/components/LevelCompletionOverlay'
 import { describeMissingGoal, getTotalLevelBeepers, isLevelGoalComplete } from '@features/karel/goals/level-goal'
+import { useTelemetry } from '@features/telemetry/hooks/useTelemetry'
+import type { ErrorCategory } from '../../../types/telemetry'
 
 interface ChatWorkspaceProps {
   session: TivotChatSession | null
@@ -72,6 +74,8 @@ export function ChatWorkspace({
     () => initialTutorialStep,
   )
   const isMobile = useIsMobile()
+  const telemetry = useTelemetry()
+  const levelStartTimeRef = useRef(Date.now())
   const runner = useKarelRunner(activeLevel.initialWorld)
   const aiContext = useTivotAiContext({
     level: activeLevel,
@@ -116,6 +120,8 @@ export function ChatWorkspace({
     setShowObjective(!hasSeenLevelHelp(activeLevel.id) && nextTutorialStep === null)
     setTutorialStep(nextTutorialStep)
     runner.resetExecution()
+    levelStartTimeRef.current = Date.now()
+    telemetry.recordLevelStart(activeLevel.id)
   }, [activeLevel])
 
   useEffect(
@@ -139,6 +145,12 @@ export function ChatWorkspace({
         line: runner.activeLineNumber,
         attempts: executionAttempts,
       })
+      // Telemetry: Classify runtime errors
+      const errCategory: ErrorCategory = runner.executionError.includes('muro') || runner.executionError.includes('fichas') || runner.executionError.includes('mochila')
+        ? 'RUNTIME_EXCEPTION'
+        : 'RUNTIME_EXCEPTION'
+      telemetry.recordCodeExecution(activeLevel.id, executionAttempts, false, errCategory, runner.executionError.slice(0, 250))
+      telemetry.evaluateHintEffectiveness(activeLevel.id, false)
       return
     }
 
@@ -149,6 +161,9 @@ export function ChatWorkspace({
         line: runner.compileResult.error.line,
         attempts: executionAttempts,
       })
+      // Telemetry: Compile/syntax error
+      telemetry.recordCodeExecution(activeLevel.id, executionAttempts, false, 'SYNTAX_ERROR', runner.compileResult.error.message.slice(0, 250))
+      telemetry.evaluateHintEffectiveness(activeLevel.id, false)
       return
     }
 
@@ -174,7 +189,26 @@ export function ChatWorkspace({
         line: null,
         attempts: executionAttempts,
       })
-      if (goalComplete) setCompletionOpen(true)
+
+      if (goalComplete) {
+        // Telemetry: Successful execution + level complete
+        const activeTimeMs = Date.now() - levelStartTimeRef.current
+        telemetry.recordCodeExecution(activeLevel.id, executionAttempts, true)
+        telemetry.evaluateHintEffectiveness(activeLevel.id, true)
+        telemetry.recordLevelComplete(activeLevel.id, executionAttempts, activeTimeMs)
+        setCompletionOpen(true)
+        // Trigger survey after Level 4
+        if (activeLevel.id === 4) {
+          telemetry.showSurvey()
+        }
+      } else {
+        // Telemetry: Code ran but didn't meet goal = logic/incomplete algorithm error
+        const errCategory: ErrorCategory = runner.worldState.beepers.some(b => b.count > 0) && activeLevel.goal.requireAllBeepers
+          ? 'LOGIC_BUSINESS_RULE'
+          : 'INCOMPLETE_ALGORITHM'
+        telemetry.recordCodeExecution(activeLevel.id, executionAttempts, false, errCategory, describeMissingGoal(activeLevel, runner.worldState).slice(0, 250))
+        telemetry.evaluateHintEffectiveness(activeLevel.id, false)
+      }
     }
   }, [
     executionAttempts,

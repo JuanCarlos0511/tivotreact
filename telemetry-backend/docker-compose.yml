@@ -1,0 +1,33 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    env_file:
+      - .env
+    networks:
+      - dokploy-network
+  db:
+    image: postgres:16-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tivot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dokploy-network
+    environment:
+      POSTGRES_USER: tivot
+      POSTGRES_PASSWORD: tivot_secret
+      POSTGRES_DB: telemetry
+
+volumes:
+  postgres_data:
+
+networks:
+  dokploy-network:
+    external: true # Comentar esto si se usa localmente sin dokploy

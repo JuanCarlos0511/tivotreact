@@ -9,6 +9,8 @@ import type {
 } from '@shared/types'
 import { createEmptyTivotConversationContext, createStandardTextPayload } from '@shared/types'
 import { processTivotUserAction } from '@services/inference.service'
+import { useTelemetry } from '@features/telemetry/hooks/useTelemetry'
+import type { AiHintType } from '../../../types/telemetry'
 
 const createMessageId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
 
@@ -104,6 +106,7 @@ export const useTivotChat = (activeLevel: KarelLevel | null) => {
   const [activeSessionId, setActiveSessionId] = useState<string>('')
   const [query, setQuery] = useState('')
   const [isResponding, setIsResponding] = useState(false)
+  const telemetry = useTelemetry()
 
   const expectedSessionId = activeLevel ? createLevelSessionId(activeLevel.id) : activeSessionId
   const activeSession = useMemo(
@@ -188,6 +191,17 @@ export const useTivotChat = (activeLevel: KarelLevel | null) => {
           : session,
       ),
     )
+
+    // Telemetry: Record AI hint request with classification
+    if (activeLevel) {
+      const hintType: AiHintType = response.payload.suggestedCode?.length
+        ? 'Solución Directa'
+        : prompt.toLowerCase().includes('error') || prompt.toLowerCase().includes('falla') || prompt.toLowerCase().includes('no funciona')
+          ? 'Corrección de Sintaxis'
+          : 'Conceptual'
+      telemetry.recordAiHintRequested(activeLevel.id, hintType)
+    }
+
     setIsResponding(false)
   }
 

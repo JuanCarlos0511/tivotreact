@@ -8,6 +8,8 @@ import { StartScreen } from '@features/navigation/StartScreen'
 import { createKarelChallenge, getKarelLevelById } from '@shared/catalog'
 import { deleteSavedChallenge, loadSavedChallenges, renameSavedChallenge, saveChallenge } from '@features/karel/storage/saved-challenges'
 import type { KarelLevel, KarelWorldState, SavedChallengeGame } from '@shared/types'
+import { TelemetryProvider } from '@features/telemetry/context/TelemetryContext'
+import '@features/telemetry/components/telemetry.css'
 import './index.css'
 import './mobile-game.css'
 
@@ -65,6 +67,7 @@ function App() {
   }
 
   return (
+    <TelemetryProvider>
     <main className={`app-shell karel-app-shell ${screen === 'WORKSPACE' ? 'game-screen-active' : ''}`}>
       {screen === 'START' && <StartScreen onStart={() => setScreen('LEVEL_SELECT')} />}
       {screen === 'LEVEL_SELECT' && (
@@ -95,6 +98,7 @@ function App() {
         />
       )}
     </main>
+    </TelemetryProvider>
   )
 }
 

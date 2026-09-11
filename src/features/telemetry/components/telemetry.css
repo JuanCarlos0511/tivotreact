@@ -1,0 +1,237 @@
+.telemetry-consent-modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(100%, 520px);
+  padding: 36px 28px;
+  border: 1px solid #a7f3d0;
+  border-radius: 18px;
+  background: #fffcf7;
+  color: #202d29;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  animation: complete-pop 0.35s ease-out;
+}
+
+.telemetry-consent-modal h2 {
+  margin: 0 0 16px;
+  font-size: 24px;
+  text-align: center;
+}
+
+.telemetry-consent-modal p {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #5e6a64;
+  text-align: center;
+}
+
+.telemetry-consent-form {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 16px;
+}
+
+.telemetry-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.telemetry-input-group label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #202d29;
+}
+
+.telemetry-input-with-button {
+  display: flex;
+  gap: 8px;
+}
+
+.telemetry-input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #d9d8cd;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  background: #ffffff;
+}
+
+.telemetry-input:focus {
+  outline: none;
+  border-color: #08734f;
+  box-shadow: 0 0 0 2px rgba(8, 115, 79, 0.2);
+}
+
+.telemetry-checkbox-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+}
+
+.telemetry-checkbox-group input {
+  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.telemetry-checkbox-group label {
+  font-size: 13px;
+  line-height: 1.4;
+  color: #065f46;
+  cursor: pointer;
+}
+
+.telemetry-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.telemetry-survey-modal {
+  width: min(100%, 580px);
+  padding: 32px;
+}
+
+.telemetry-survey-questions {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  margin: 20px 0;
+}
+
+.telemetry-question {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.telemetry-question-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: #202d29;
+}
+
+.telemetry-likert {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.telemetry-likert-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #d9d8cd;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #5e6a64;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.telemetry-likert-btn:hover {
+  border-color: #08734f;
+  color: #08734f;
+  background: #f0fdf4;
+}
+
+.telemetry-likert-btn.selected {
+  background: #08734f;
+  border-color: #08734f;
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+.telemetry-likert-labels {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 4px;
+  font-size: 11px;
+  color: #89938d;
+}
+
+.telemetry-researcher-modal {
+  width: min(100%, 480px);
+  padding: 24px;
+  text-align: left;
+}
+
+.telemetry-researcher-modal h2 {
+  text-align: left;
+}
+
+.telemetry-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.telemetry-stat-card {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.telemetry-stat-value {
+  font-size: 24px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.telemetry-stat-label {
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.telemetry-researcher-trigger {
+  position: fixed;
+  bottom: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.08);
+  color: #4b5563;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.2s, background 0.2s, transform 0.2s;
+  z-index: 9999;
+  user-select: none;
+}
+
+.telemetry-researcher-trigger:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.15);
+  transform: scale(1.08);
+}
