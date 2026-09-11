@@ -33,5 +33,8 @@ app = FastAPI(
 app.add_middleware(ZeroPIIMiddleware)
 setup_cors(app, settings.cors_origins_list)
 
+from app.api.v1.endpoints.health import router as health_router
+
 # Incluir rutas
+app.include_router(health_router, prefix="/health", tags=["health"])
 app.include_router(api_router, prefix="/api/v1")
