@@ -1,5 +1,6 @@
 import type { AiProvider } from '@shared/types'
 import type { AiProviderRuntimeConfig } from './ai-provider.types'
+import { sanitizeUserInput } from '../privacy/sanitize-input'
 
 interface GeminiResponse {
   candidates?: Array<{
@@ -21,7 +22,7 @@ export class GeminiAdapter implements AiProvider {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          contents: [{ role: 'user', parts: [{ text: sanitizeUserInput(prompt) }] }],
           generationConfig: {
             temperature: this.config.temperature,
             responseMimeType: 'application/json',

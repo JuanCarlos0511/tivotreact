@@ -17,6 +17,7 @@ import { createStandardTextPayload, isInteractiveFlowProblem } from '@shared/typ
 import { createAiProvider } from './ai'
 import { parseAssistantPayload } from './parser.service'
 import { createCompleteLevelSolution } from './direct-level-solution'
+import { sanitizeUserInput } from './privacy/sanitize-input'
 import {
   createSafeKarelCodeExample,
   explicitlyRequestsCode,
@@ -66,12 +67,30 @@ export const processTivotUserAction = async ({
   activeLevel = null,
   aiContext = null,
 }: ProcessUserActionInput): Promise<TivotResponse> => {
-  const result = await resolvePayload(userPayload, context, catalog, conversationHistory, activeLevel, aiContext)
+  const sanitizedUserPayload = sanitizeUserPayload(userPayload)
+  const result = await resolvePayload(
+    sanitizedUserPayload,
+    context,
+    catalog,
+    conversationHistory,
+    activeLevel,
+    aiContext,
+  )
 
   return {
     ...result,
-    context: appendTurn(context, userPayload, result.payload),
+    context: appendTurn(context, sanitizedUserPayload, result.payload),
   }
+}
+
+const sanitizeUserPayload = (userPayload: TivotUserPayload): TivotUserPayload => {
+  if (userPayload.user_action === 'send_message') {
+    return { ...userPayload, message: sanitizeUserInput(userPayload.message) }
+  }
+
+  return userPayload.user_comment
+    ? { ...userPayload, user_comment: sanitizeUserInput(userPayload.user_comment) }
+    : userPayload
 }
 
 const resolvePayload = async (
@@ -315,7 +334,8 @@ const cleanTurnMessages = (turn: TivotConversationContext['turns'][number]): AiC
   { role: 'assistant', content: cleanText(turn.assistant_message) },
 ]
 
-const cleanText = (text: string): string => extractMessageFromJson(text).replace(/\s+/g, ' ').trim()
+const cleanText = (text: string): string =>
+  sanitizeUserInput(extractMessageFromJson(text)).replace(/\s+/g, ' ').trim()
 
 const normalizeText = (text: string): string => cleanText(text).toLowerCase()
 

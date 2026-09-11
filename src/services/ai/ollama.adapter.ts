@@ -1,5 +1,6 @@
 import type { AiProvider } from '@shared/types'
 import type { AiProviderRuntimeConfig } from './ai-provider.types'
+import { sanitizeUserInput } from '../privacy/sanitize-input'
 
 interface OllamaGenerateResponse {
   response?: string
@@ -17,7 +18,7 @@ export class OllamaAdapter implements AiProvider {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: this.config.modelName,
-        prompt,
+        prompt: sanitizeUserInput(prompt),
         stream: false,
         options: {
           temperature: this.config.temperature,

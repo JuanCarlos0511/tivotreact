@@ -1,5 +1,6 @@
 import type { AiChatMessage, AiProvider } from '@shared/types'
 import type { AiProviderRuntimeConfig } from './ai-provider.types'
+import { sanitizeUserInput } from '../privacy/sanitize-input'
 
 interface OpenAiChatResponse {
   choices?: Array<{
@@ -23,7 +24,10 @@ export class OpenAiAdapter implements AiProvider {
         model: this.config.modelName,
         temperature: this.config.temperature,
         response_format: { type: 'json_object' },
-        messages,
+        messages: messages.map((message) => ({
+          ...message,
+          content: sanitizeUserInput(message.content),
+        })),
       }),
       signal: AbortSignal.timeout(this.config.timeoutMs),
     })

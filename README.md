@@ -54,6 +54,11 @@ El contenedor del backend ejecuta `alembic upgrade head` antes de iniciar FastAP
 
 La telemetría utiliza IDs anónimos, una cola persistente offline-first e ingesta idempotente. No se envían nombre, correo, IP, agente de usuario ni resolución de pantalla.
 
+El chat muestra una advertencia Zero-PII y enmascara correos y números de
+matrícula de 6 a 10 dígitos antes de guardarlos en el navegador o enviarlos a
+cualquier proveedor LLM. El backend vuelve a sanitizar recursivamente todos los
+campos textuales recibidos mediante telemetría antes de persistirlos.
+
 La ingesta principal está disponible en `POST /api/v1/telemetry/events` y admite
 un evento, una lista o `{ "events": [...] }`; `/telemetry/batch` se conserva por
 compatibilidad. Las analíticas requieren autenticación de investigador. Si se

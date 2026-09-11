@@ -163,6 +163,7 @@ export function FloatingChatDrawer({
                 value={query}
                 onChange={(event) => onQueryChange(event.target.value)}
                 onKeyDown={handleKeyDown}
+                aria-describedby="chat-privacy-notice"
                 placeholder="Pregunta sobre tu codigo..."
                 rows={2}
               />
@@ -176,6 +177,9 @@ export function FloatingChatDrawer({
                 {isResponding ? <Loader2 className="spin" size={17} /> : <Send size={17} />}
               </button>
             </div>
+            <p id="chat-privacy-notice" className="chat-privacy-notice">
+              El chat es anónimo para fines de investigación académica. Por favor, no compartas datos personales, nombres ni información sensible.
+            </p>
           </section>
       )}
     </>

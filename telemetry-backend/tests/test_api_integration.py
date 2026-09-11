@@ -1,11 +1,13 @@
 import asyncio
 from datetime import datetime, timezone
+from pathlib import Path
+import tempfile
 import uuid
 
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import NullPool
 
 from app.api.deps import get_db
 from app.core.config import settings
@@ -17,9 +19,10 @@ from app.models.session import Session
 from app.models.survey import SurveyResponse
 
 
+test_database_path = Path(tempfile.gettempdir()) / f"tivot-telemetry-{uuid.uuid4().hex}.db"
 engine = create_async_engine(
-    "sqlite+aiosqlite://",
-    poolclass=StaticPool,
+    f"sqlite+aiosqlite:///{test_database_path}",
+    poolclass=NullPool,
 )
 session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
@@ -62,6 +65,11 @@ async def row_counts() -> tuple[int, int, int, int]:
         )
 
 
+async def stored_event(event_id: uuid.UUID) -> TelemetryEvent | None:
+    async with session_factory() as session:
+        return await session.get(TelemetryEvent, event_id)
+
+
 def test_ingestion_analytics_exports_cors_and_security() -> None:
     asyncio.run(reset_database())
     app.dependency_overrides[get_db] = override_get_db
@@ -89,6 +97,8 @@ def test_ingestion_analytics_exports_cors_and_security() -> None:
             attempt_number=1,
             is_success=False,
             error_category="LOGIC_BUSINESS_RULE",
+            error_message_snippet="Cuenta 12345678",
+            payload={"student_message": "Escríbeme a alumno@example.edu.mx"},
         )
         response = client.post(
             "/api/v1/telemetry/events",
@@ -96,6 +106,12 @@ def test_ingestion_analytics_exports_cors_and_security() -> None:
         )
         assert response.status_code == 200
         assert response.json() == {"received": 2, "stored": 1}
+        persisted = asyncio.run(stored_event(duplicate_id))
+        assert persisted is not None
+        assert persisted.error_message_snippet == "Cuenta [MATRÍCULA_ANÓNIMA]"
+        assert persisted.payload == {
+            "student_message": "Escríbeme a [CORREO_ANÓNIMO]"
+        }
 
         survey = event_payload(
             uuid.uuid4(),
@@ -160,4 +176,6 @@ def test_ingestion_analytics_exports_cors_and_security() -> None:
     finally:
         settings.TELEMETRY_CLIENT_KEY = original_client_key
         app.dependency_overrides.clear()
+        client.close()
         asyncio.run(engine.dispose())
+        test_database_path.unlink(missing_ok=True)

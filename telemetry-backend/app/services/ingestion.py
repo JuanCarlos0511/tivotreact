@@ -12,6 +12,7 @@ from app.models.participant import Participant
 from app.models.session import Session
 from app.models.survey import SurveyResponse
 from app.schemas.telemetry import SessionCreate, SurveyCreate, TelemetryEventCreate
+from app.core.privacy import sanitize_input, sanitize_payload
 
 
 def calculate_sus(answers: list[int]) -> float:
@@ -61,7 +62,7 @@ async def create_session(db: AsyncSession, data: SessionCreate) -> Session:
     session = Session(
         id=data.session_id,
         participant_id=data.participant_id,
-        condition=data.condition,
+        condition=sanitize_input(data.condition),
         has_assent=data.has_assent,
         started_at=data.entry_timestamp,
     )
@@ -78,7 +79,7 @@ async def _recover_session(db: AsyncSession, session_id: uuid.UUID, events: list
     start = next((event for event in events if event.session_id == session_id and event.event_type == "session_started"), None)
     if not start:
         return None
-    payload = start.payload or {}
+    payload = sanitize_payload(start.payload or {})
     await _ensure_participant(db, start.participant_id, start.timestamp)
     session = Session(
         id=session_id,
@@ -93,7 +94,7 @@ async def _recover_session(db: AsyncSession, session_id: uuid.UUID, events: list
 
 
 def _survey_from_event(event: TelemetryEventCreate) -> SurveyCreate | None:
-    payload = event.payload or {}
+    payload = sanitize_payload(event.payload or {})
     raw = payload.get("answers")
     if not isinstance(raw, dict):
         return None
@@ -131,7 +132,9 @@ async def ingest_batch(db: AsyncSession, events: list[TelemetryEventCreate]) -> 
         if not session or not session.has_assent or session.participant_id != event.participant_id:
             continue
         if event.event_id not in existing_ids:
-            values = event.model_dump(exclude={"event_id", "timestamp"})
+            values = sanitize_payload(
+                event.model_dump(exclude={"event_id", "timestamp"})
+            )
             event_rows.append({"id": event.event_id, "timestamp": event.timestamp, **values})
         if event.event_type == "level_completed" and event.level_id == 4:
             session.completed_at = event.timestamp
@@ -165,7 +168,10 @@ async def _upsert_survey(db: AsyncSession, data: SurveyCreate) -> SurveyResponse
     if data.participant_id and data.participant_id != session.participant_id:
         raise ValueError("El participante no corresponde a la sesión")
     participant_id = session.participant_id
-    raw = data.raw_answers or data.model_dump(exclude={"session_id", "participant_id", "raw_answers"})
+    raw = sanitize_payload(
+        data.raw_answers
+        or data.model_dump(exclude={"session_id", "participant_id", "raw_answers"})
+    )
     tam_scores = {
         "perceived_usefulness": data.tam_perceived_usefulness,
         "perceived_ease_of_use": data.tam_perceived_ease_of_use,

@@ -1,5 +1,6 @@
 import type { AiProvider } from '@shared/types'
 import type { AiProviderRuntimeConfig, ChatContextMessage } from './ai-provider.types'
+import { sanitizeUserInput } from '../privacy/sanitize-input'
 
 interface QwenChatResponse {
   choices?: Array<{
@@ -27,7 +28,10 @@ export class QwenAdapter implements AiProvider {
         model: this.config.modelName,
         temperature: 0.5,
         response_format: { type: 'json_object' },
-        messages,
+        messages: messages.map((message) => ({
+          ...message,
+          content: sanitizeUserInput(message.content),
+        })),
       }),
       signal: AbortSignal.timeout(this.config.timeoutMs),
     })

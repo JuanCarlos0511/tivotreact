@@ -9,6 +9,7 @@ import type {
 } from '@shared/types'
 import { createEmptyTivotConversationContext, createStandardTextPayload } from '@shared/types'
 import { processTivotUserAction } from '@services/inference.service'
+import { sanitizeUserInput } from '@services/privacy/sanitize-input'
 import { useTelemetry } from '@features/telemetry/hooks/useTelemetry'
 import type { AiHintType } from '../../../types/telemetry'
 
@@ -75,17 +76,27 @@ const loadLevelSession = (level: KarelLevel): TivotChatSession | null => {
       ...session,
       id: createLevelSessionId(level.id),
       title: level.title,
+      context: {
+        ...session.context,
+        turns: session.context.turns.map((turn) => ({
+          ...turn,
+          user_message: sanitizeUserInput(turn.user_message),
+          assistant_message: sanitizeUserInput(turn.assistant_message),
+        })),
+      },
       messages: session.messages.map((message) =>
         message.role === 'assistant'
           ? {
               ...message,
               payload: {
                 ...message.payload,
+                message: sanitizeUserInput(message.payload.message),
+                options: message.payload.options?.map(sanitizeUserInput) ?? null,
                 suggestsCode: Boolean(message.payload.suggestedCode?.length),
                 suggestedCode: message.payload.suggestedCode?.length ? message.payload.suggestedCode : null,
               },
             }
-          : message,
+          : { ...message, content: sanitizeUserInput(message.content) },
       ),
     }
   } catch {
@@ -159,8 +170,10 @@ export const useTivotChat = (activeLevel: KarelLevel | null) => {
   const submitPrompt = async (prompt: string, aiContext: TivotAiContext) => {
     if (!activeSession || !activeLevel || isResponding) return
 
+    const sanitizedPrompt = sanitizeUserInput(prompt.trim())
+    if (!sanitizedPrompt) return
     const sessionSnapshot = activeSession
-    const userMessage = createUserMessage(prompt)
+    const userMessage = createUserMessage(sanitizedPrompt)
     const updatedMessages = [...sessionSnapshot.messages, userMessage]
 
     setQuery('')
@@ -171,7 +184,7 @@ export const useTivotChat = (activeLevel: KarelLevel | null) => {
       ),
     )
 
-    const normalizedPrompt = prompt.toLowerCase()
+    const normalizedPrompt = sanitizedPrompt.toLowerCase()
     const hintType: AiHintType = /(?:código|codigo|solución|solucion)\s+(?:completo|direct[ao])|resu[eé]lvelo|hazlo por m[ií]/.test(normalizedPrompt)
       ? 'Solución Directa'
       : /error|sintaxis|corrige|falla|no funciona/.test(normalizedPrompt)
@@ -180,7 +193,7 @@ export const useTivotChat = (activeLevel: KarelLevel | null) => {
     telemetry.recordAiHintRequested(activeLevel.id, hintType)
 
     const response = await processTivotUserAction({
-      userPayload: { user_action: 'send_message', message: prompt },
+      userPayload: { user_action: 'send_message', message: sanitizedPrompt },
       context: sessionSnapshot.context,
       conversationHistory: updatedMessages,
       activeLevel,
@@ -192,7 +205,7 @@ export const useTivotChat = (activeLevel: KarelLevel | null) => {
         session.id === sessionSnapshot.id
           ? {
               ...session,
-              title: session.messages.length === 2 ? createSessionTitle(prompt) : session.title,
+              title: session.messages.length === 2 ? createSessionTitle(sanitizedPrompt) : session.title,
               context: response.context,
               messages: [...session.messages, createAssistantMessage(response.payload)],
             }
