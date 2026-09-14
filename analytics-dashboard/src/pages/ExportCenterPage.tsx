@@ -44,8 +44,8 @@ export function ExportCenterPage() {
           filename="student_metrics_summary.csv"
           format="CSV"
           badge="Nivel Estudiante"
-          description="Una fila por participante con variables consolidadas: intentos y tiempos activos desglosados N1-N4, efectividad de pistas IA, y puntajes TAM/SUS."
-          targetUse="Pruebas t-Student (N1 vs N4), ANOVA de medidas repetidas, correlaciones de Pearson/Spearman y regresiones lineales en SPSS, R o SciPy."
+          description="Una fila por participante con tablet de origen, intentos y tiempos activos desglosados N1-N5, finalización del desafío, efectividad de pistas IA y puntajes TAM/SUS."
+          targetUse="Pruebas t-Student, ANOVA de medidas repetidas, análisis del desafío N5, correlaciones de Pearson/Spearman y regresiones lineales en SPSS, R o SciPy."
         />
 
         <DatasetDownloadCard

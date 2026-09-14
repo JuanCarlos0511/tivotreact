@@ -106,7 +106,7 @@ export function DashboardPage() {
         <MetricCard
           title="Tasa de Finalización"
           value={overview ? `${overview.completion_rate}%` : '—'}
-          subtitle={`${overview ? overview.completed_participants : 0} completaron Nivel 4`}
+          subtitle={`${overview ? overview.completed_participants : 0} completaron el desafío Nivel 5`}
           icon={TrendingDown}
           badge={{
             text: overview && overview.completion_rate >= 70 ? 'Óptima' : 'En progreso',

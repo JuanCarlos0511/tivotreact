@@ -25,7 +25,7 @@ export function LearningCurveChart({ data }: Props) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h3 className="font-bold text-slate-900 text-base">Curva de Aprendizaje Progresivo</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Evolución de tiempo activo e intentos desde Nivel 1 hasta Nivel 4</p>
+          <p className="text-xs text-slate-500 mt-0.5">Evolución de tiempo activo e intentos desde Nivel 1 hasta el desafío Nivel 5</p>
         </div>
 
         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl self-start sm:self-auto text-xs font-semibold">
@@ -51,7 +51,7 @@ export function LearningCurveChart({ data }: Props) {
       </div>
 
       {/* Chart visualization */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
         {data.map((item) => {
           const val = metric === 'time' ? item.median_time_s : item.median_attempts;
           const max = metric === 'time' ? maxTime : maxAttempts;
@@ -67,7 +67,7 @@ export function LearningCurveChart({ data }: Props) {
                 <div
                   style={{ height: `${heightPct}%` }}
                   className={`w-full max-w-[48px] rounded-lg transition-all duration-500 ${
-                    item.level_id === 4
+                    item.level_id === 5
                       ? 'bg-emerald-600 group-hover:bg-emerald-500 shadow-md shadow-emerald-200'
                       : 'bg-emerald-400 group-hover:bg-emerald-300'
                   }`}
@@ -82,7 +82,7 @@ export function LearningCurveChart({ data }: Props) {
       </div>
 
       {/* Statistical summary strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-4 border-t border-slate-100 text-xs">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-4 border-t border-slate-100 text-xs">
         {data.map((item) => (
           <div key={item.level_id} className="bg-slate-50 rounded-lg p-2.5 border border-slate-100">
             <div className="font-semibold text-slate-700">{item.level_name}</div>

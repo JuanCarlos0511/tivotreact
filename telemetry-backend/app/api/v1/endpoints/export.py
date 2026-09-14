@@ -10,6 +10,7 @@ from sqlalchemy import select, and_, func
 from app.api.deps import get_db, verify_admin_key
 from app.models.session import Session
 from app.models.event import TelemetryEvent
+from app.models.participant import Participant
 from app.models.survey import SurveyResponse
 from app.services.export import stream_csv, stream_json, stream_jsonl
 
@@ -23,9 +24,10 @@ def format_csv_row(row: list) -> str:
 
 async def stream_student_summary_csv(db: AsyncSession):
     headers = [
-        "participant_id", "condition", "has_assent",
-        "attempts_lvl1", "attempts_lvl2", "attempts_lvl3", "attempts_lvl4",
-        "time_lvl1_s", "time_lvl2_s", "time_lvl3_s", "time_lvl4_s",
+        "participant_id", "tablet_id", "condition", "has_assent",
+        "attempts_lvl1", "attempts_lvl2", "attempts_lvl3", "attempts_lvl4", "attempts_lvl5",
+        "time_lvl1_s", "time_lvl2_s", "time_lvl3_s", "time_lvl4_s", "time_lvl5_s",
+        "challenge_completed",
         "total_active_time_s", "total_hints_requested", "hints_effective_count",
         "tam_pu", "tam_peou", "tam_ai_scaffolding", "tam_ai_trust", "tam_intention_to_use", "sus_score"
     ]
@@ -38,7 +40,7 @@ async def stream_student_summary_csv(db: AsyncSession):
         # Attempts per level
         attempts = {}
         times = {}
-        for lvl in range(1, 5):
+        for lvl in range(1, 6):
             att_q = await db.execute(
                 select(func.max(TelemetryEvent.attempt_number))
                 .where(and_(TelemetryEvent.session_id == s.id, TelemetryEvent.level_id == lvl))
@@ -47,7 +49,13 @@ async def stream_student_summary_csv(db: AsyncSession):
 
             time_q = await db.execute(
                 select(TelemetryEvent.active_time_ms)
-                .where(and_(TelemetryEvent.session_id == s.id, TelemetryEvent.level_id == lvl, TelemetryEvent.event_type == "level_completed"))
+                .where(
+                    and_(
+                        TelemetryEvent.session_id == s.id,
+                        TelemetryEvent.level_id == lvl,
+                        TelemetryEvent.event_type.in_(["level_completed", "level_abandoned"]),
+                    )
+                )
             )
             t_ms = time_q.scalar_one()
             times[lvl] = round(t_ms / 1000, 2) if t_ms else 0.0
@@ -58,6 +66,17 @@ async def stream_student_summary_csv(db: AsyncSession):
             .where(and_(TelemetryEvent.session_id == s.id, TelemetryEvent.event_type == "level_completed"))
         )
         total_time_ms = tot_time_q.scalar_one() or 0
+        abandoned_time_q = await db.execute(
+            select(func.sum(TelemetryEvent.active_time_ms))
+            .where(and_(TelemetryEvent.session_id == s.id, TelemetryEvent.event_type == "level_abandoned"))
+        )
+        total_time_ms += abandoned_time_q.scalar_one() or 0
+
+        participant_metadata_q = await db.execute(
+            select(Participant.metadata_json).where(Participant.anonymous_code == s.participant_id)
+        )
+        participant_metadata = participant_metadata_q.scalar_one_or_none() or {}
+        challenge_completed = bool(s.completed_at) and times.get(5, 0.0) > 0
 
         # Hints
         hints_q = await db.execute(
@@ -78,16 +97,20 @@ async def stream_student_summary_csv(db: AsyncSession):
 
         row = [
             s.participant_id,
+            participant_metadata.get("tablet_id"),
             s.condition,
             s.has_assent,
             attempts.get(1, 0),
             attempts.get(2, 0),
             attempts.get(3, 0),
             attempts.get(4, 0),
+            attempts.get(5, 0),
             times.get(1, 0.0),
             times.get(2, 0.0),
             times.get(3, 0.0),
             times.get(4, 0.0),
+            times.get(5, 0.0),
+            challenge_completed,
             round(total_time_ms / 1000, 2),
             total_hints,
             eff_hints,
@@ -155,15 +178,31 @@ async def export_xlsx(db: AsyncSession = Depends(get_db)):
     # Sheet 1: Participantes
     ws1 = wb.active
     ws1.title = "1_Participantes"
-    ws1.append(["Participant ID", "Condición", "Asentimiento", "Inicio", "Fin"])
+    ws1.append(["Participant ID", "Tablet", "Condición", "Asentimiento", "Inicio", "Fin", "Desafío N5 completado"])
 
     sessions_q = await db.execute(select(Session).order_by(Session.started_at.asc()))
     sessions = sessions_q.scalars().all()
     for s in sessions:
+        metadata_q = await db.execute(
+            select(Participant.metadata_json).where(Participant.anonymous_code == s.participant_id)
+        )
+        metadata = metadata_q.scalar_one_or_none() or {}
+        challenge_q = await db.execute(
+            select(func.count(TelemetryEvent.id)).where(
+                and_(
+                    TelemetryEvent.session_id == s.id,
+                    TelemetryEvent.level_id == 5,
+                    TelemetryEvent.event_type == "level_completed",
+                    TelemetryEvent.is_success.is_not(False),
+                )
+            )
+        )
+        challenge_completed = (challenge_q.scalar_one() or 0) > 0
         ws1.append([
-            s.participant_id, s.condition, "Sí" if s.has_assent else "No",
+            s.participant_id, metadata.get("tablet_id"), s.condition, "Sí" if s.has_assent else "No",
             s.started_at.strftime("%Y-%m-%d %H:%M:%S") if s.started_at else "",
             s.completed_at.strftime("%Y-%m-%d %H:%M:%S") if s.completed_at else "",
+            "Sí" if challenge_completed else "No",
         ])
 
     # Sheet 2: Rendimiento Niveles
@@ -172,7 +211,7 @@ async def export_xlsx(db: AsyncSession = Depends(get_db)):
 
     events_q = await db.execute(
         select(TelemetryEvent)
-        .where(TelemetryEvent.event_type.in_(["level_completed", "code_run", "syntax_error"]))
+        .where(TelemetryEvent.event_type.in_(["level_completed", "level_abandoned", "code_run", "syntax_error"]))
         .order_by(TelemetryEvent.timestamp.asc())
     )
     events = events_q.scalars().all()

@@ -136,7 +136,11 @@ async def ingest_batch(db: AsyncSession, events: list[TelemetryEventCreate]) -> 
                 event.model_dump(exclude={"event_id", "timestamp"})
             )
             event_rows.append({"id": event.event_id, "timestamp": event.timestamp, **values})
-        if event.event_type == "level_completed" and event.level_id == 4:
+        if (
+            event.event_type == "level_completed"
+            and event.level_id == 5
+            and event.is_success is not False
+        ):
             session.completed_at = event.timestamp
         if event.event_type == "survey_submitted":
             survey = _survey_from_event(event)

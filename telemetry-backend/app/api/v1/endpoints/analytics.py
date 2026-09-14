@@ -6,6 +6,7 @@ from typing import Literal, Optional, List
 import numpy as np
 
 from app.api.deps import get_db, verify_admin_key
+from app.models.participant import Participant
 from app.models.session import Session
 from app.models.event import TelemetryEvent
 from app.models.survey import SurveyResponse
@@ -29,10 +30,17 @@ async def get_analytics_overview(
     )
     total_participants = total_q.scalar_one() or 0
 
-    # Finalizados
+    # Finalizados: el nivel 5 es el desafío final.
     completed_q = await db.execute(
-        select(func.count(distinct(Session.participant_id))).where(
-            and_(*base_session_filter, Session.completed_at.is_not(None))
+        select(func.count(distinct(Session.participant_id)))
+        .join(TelemetryEvent, TelemetryEvent.session_id == Session.id)
+        .where(
+            and_(
+                *base_session_filter,
+                TelemetryEvent.level_id == 5,
+                TelemetryEvent.event_type == "level_completed",
+                TelemetryEvent.is_success.is_not(False),
+            )
         )
     )
     completed_participants = completed_q.scalar_one() or 0
@@ -68,7 +76,7 @@ async def get_analytics_overview(
 
     # Abandono por nivel
     dropout_by_level = {}
-    for lvl in range(1, 5):
+    for lvl in range(1, 6):
         started_q = await db.execute(
             select(func.count(distinct(TelemetryEvent.participant_id)))
             .join(Session, TelemetryEvent.session_id == Session.id)
@@ -79,7 +87,14 @@ async def get_analytics_overview(
         done_q = await db.execute(
             select(func.count(distinct(TelemetryEvent.participant_id)))
             .join(Session, TelemetryEvent.session_id == Session.id)
-            .where(and_(*base_session_filter, TelemetryEvent.level_id == lvl, TelemetryEvent.event_type == "level_completed"))
+            .where(
+                and_(
+                    *base_session_filter,
+                    TelemetryEvent.level_id == lvl,
+                    TelemetryEvent.event_type == "level_completed",
+                    TelemetryEvent.is_success.is_not(False),
+                )
+            )
         )
         done = done_q.scalar_one() or 0
         dropout_by_level[lvl] = round((1 - (done / started)) * 100, 1) if started > 0 else 0.0
@@ -108,7 +123,7 @@ async def get_learning_curve(
         base_filter.append(Session.condition == condition)
 
     levels_data = []
-    for lvl in range(1, 5):
+    for lvl in range(1, 6):
         # Intentos por participante en este nivel
         attempts_q = await db.execute(
             select(func.max(TelemetryEvent.attempt_number))
@@ -122,7 +137,15 @@ async def get_learning_curve(
         times_q = await db.execute(
             select(TelemetryEvent.active_time_ms)
             .join(Session, TelemetryEvent.session_id == Session.id)
-            .where(and_(*base_filter, TelemetryEvent.level_id == lvl, TelemetryEvent.event_type == "level_completed", TelemetryEvent.active_time_ms.is_not(None)))
+            .where(
+                and_(
+                    *base_filter,
+                    TelemetryEvent.level_id == lvl,
+                    TelemetryEvent.event_type == "level_completed",
+                    TelemetryEvent.is_success.is_not(False),
+                    TelemetryEvent.active_time_ms.is_not(None),
+                )
+            )
         )
         times_list = [(r[0] / 1000) for r in times_q.all() if r[0] is not None]
 
@@ -130,7 +153,15 @@ async def get_learning_curve(
         first_try_q = await db.execute(
             select(func.count(distinct(TelemetryEvent.participant_id)))
             .join(Session, TelemetryEvent.session_id == Session.id)
-            .where(and_(*base_filter, TelemetryEvent.level_id == lvl, TelemetryEvent.event_type == "level_completed", TelemetryEvent.attempt_number == 1))
+            .where(
+                and_(
+                    *base_filter,
+                    TelemetryEvent.level_id == lvl,
+                    TelemetryEvent.event_type == "level_completed",
+                    TelemetryEvent.is_success.is_not(False),
+                    TelemetryEvent.attempt_number == 1,
+                )
+            )
         )
         first_try_count = first_try_q.scalar_one() or 0
         total_finished = len(times_list)
@@ -327,6 +358,16 @@ async def get_participants_list(
         )
         total_time_ms = time_q.scalar_one() or 0
 
+        abandoned_time_q = await db.execute(
+            select(func.sum(TelemetryEvent.active_time_ms)).where(
+                and_(
+                    TelemetryEvent.session_id == s.id,
+                    TelemetryEvent.event_type == "level_abandoned",
+                )
+            )
+        )
+        total_time_ms += abandoned_time_q.scalar_one() or 0
+
         # Total hints requested
         hints_q = await db.execute(
             select(func.count(TelemetryEvent.id)).where(
@@ -334,6 +375,46 @@ async def get_participants_list(
             )
         )
         hints_count = hints_q.scalar_one() or 0
+
+        challenge_completed_q = await db.execute(
+            select(func.count(TelemetryEvent.id)).where(
+                and_(
+                    TelemetryEvent.session_id == s.id,
+                    TelemetryEvent.level_id == 5,
+                    TelemetryEvent.event_type == "level_completed",
+                    TelemetryEvent.is_success.is_not(False),
+                )
+            )
+        )
+        challenge_completed = (challenge_completed_q.scalar_one() or 0) > 0
+
+        abandoned_q = await db.execute(
+            select(func.count(TelemetryEvent.id)).where(
+                and_(
+                    TelemetryEvent.session_id == s.id,
+                    TelemetryEvent.event_type == "level_abandoned",
+                )
+            )
+        )
+        was_abandoned = (abandoned_q.scalar_one() or 0) > 0
+
+        metadata_q = await db.execute(
+            select(Participant.metadata_json).where(
+                Participant.anonymous_code == s.participant_id
+            )
+        )
+        metadata = metadata_q.scalar_one_or_none() or {}
+        tablet_id = metadata.get("tablet_id")
+
+        if challenge_completed:
+            status = "Finalizado"
+            challenge_status = "Completado"
+        elif was_abandoned:
+            status = "No completó"
+            challenge_status = "No completado" if max_lvl == 5 else "No alcanzado"
+        else:
+            status = "En progreso"
+            challenge_status = "En progreso" if max_lvl == 5 else "No alcanzado"
 
         items.append({
             "id": str(s.id),
@@ -343,7 +424,10 @@ async def get_participants_list(
             "max_level": max_lvl,
             "total_active_time_s": round(total_time_ms / 1000, 1),
             "total_hints_used": hints_count,
-            "status": "Finalizado" if s.completed_at else "En progreso",
+            "tablet_id": tablet_id,
+            "challenge_completed": challenge_completed,
+            "challenge_status": challenge_status,
+            "status": status,
             "started_at": s.started_at.isoformat() if s.started_at else None,
         })
 

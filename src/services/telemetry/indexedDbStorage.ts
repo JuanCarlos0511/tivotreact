@@ -167,7 +167,7 @@ const legacyEventTypes: Record<string, TelemetryEvent['event_type']> = {
 
 const canonicalEventTypes = new Set<TelemetryEvent['event_type']>([
   'session_started', 'level_started', 'code_run', 'syntax_error',
-  'ai_hint_requested', 'level_completed', 'idle_detected', 'survey_submitted',
+  'ai_hint_requested', 'level_completed', 'level_abandoned', 'idle_detected', 'survey_submitted',
 ]);
 
 function sortEvents(events: TelemetryEvent[]): TelemetryEvent[] {

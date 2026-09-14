@@ -72,6 +72,9 @@ export interface ParticipantItem {
   max_level: number;
   total_active_time_s: number;
   total_hints_used: number;
+  tablet_id: string | null;
+  challenge_completed: boolean;
+  challenge_status: 'Completado' | 'No completado' | 'En progreso' | 'No alcanzado';
   status: string;
   started_at: string | null;
 }

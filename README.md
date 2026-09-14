@@ -52,6 +52,24 @@ docker compose up --build
 
 El contenedor del backend ejecuta `alembic upgrade head` antes de iniciar FastAPI. Los frontends se compilan con Vite y se sirven con Nginx, incluyendo fallback para rutas SPA. En Dokploy se pueden publicar los tres servicios web por separado manteniendo `postgres` y la red `tivot_internal` como recursos privados.
 
+## Seeder de la jornada del 14 de septiembre
+
+El backend incluye un seeder idempotente para generar 15, 18 y 11 participaciones
+en las tablets 1, 2 y 3 respectivamente (44 en total), distribuidas entre las 09:21 y las 13:48
+en la zona horaria de Ciudad de México. Antes de insertarlas puede revisarse el
+resumen sin modificar la base:
+
+Una proporción pequeña recibe una o, de forma aún menos frecuente, dos pistas de
+IA. Ningún registro sintético recibe más de dos.
+
+```bash
+docker compose exec backend python -m app.seeds.field_session --dry-run
+docker compose exec backend python -m app.seeds.field_session
+```
+
+Las cantidades pueden ajustarse, por ejemplo, con `--tablet-counts 12,16,14`, y una segunda ejecución con la
+misma configuración no duplica registros.
+
 La telemetría utiliza IDs anónimos, una cola persistente offline-first e ingesta idempotente. No se envían nombre, correo, IP, agente de usuario ni resolución de pantalla.
 
 El chat muestra una advertencia Zero-PII y enmascara correos y números de

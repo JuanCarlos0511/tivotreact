@@ -146,7 +146,8 @@ export const createKarelChallenge = (): KarelLevel => {
   const objective = `Recoge todas las fichas de la cuadrícula y regresa a la meta en la calle ${goal.street}, avenida ${goal.avenue}. Empiezas mirando al este.`
 
   return {
-    id: -Date.now(),
+    // El desafío es el nivel 5 para que su telemetría sea válida y comparable.
+    id: 5,
     mode: 'challenge',
     title: 'Recolección dinámica',
     subtitle: `Dificultad ${difficultyLabel.toLowerCase()}`,

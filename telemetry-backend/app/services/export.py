@@ -30,7 +30,7 @@ async def get_export_query(db: AsyncSession):
 async def stream_csv(db: AsyncSession) -> AsyncGenerator[str, None]:
     """Flujo asíncrono para exportar datos en formato CSV."""
     headers = [
-        "participant_id", "condition", "session_id", "event_id", "level_id", "event_type",
+        "participant_id", "tablet_id", "condition", "session_id", "event_id", "level_id", "event_type", "challenge_completed",
         "step_index", "is_success", "attempt_number", "active_time_ms", "idle_time_ms", 
         "error_category", "error_message_snippet", "ai_hint_type", "ai_hint_effective", 
         "autonomy_score", "timestamp", "has_assent", "sus_score",
@@ -42,11 +42,13 @@ async def stream_csv(db: AsyncSession) -> AsyncGenerator[str, None]:
     async for event, session, survey in stream:
         row = [
             session.participant_id,
+            (event.payload or {}).get("tablet_id"),
             session.condition,
             str(session.id),
             str(event.id),
             event.level_id,
             event.event_type,
+            (event.payload or {}).get("challenge_completed"),
             event.step_index,
             event.is_success,
             event.attempt_number,
@@ -74,11 +76,13 @@ async def stream_jsonl(db: AsyncSession) -> AsyncGenerator[str, None]:
     async for event, session, survey in stream:
         data = {
             "participant_id": session.participant_id,
+            "tablet_id": (event.payload or {}).get("tablet_id"),
             "condition": session.condition,
             "session_id": str(session.id),
             "event_id": str(event.id),
             "level_id": event.level_id,
             "event_type": event.event_type,
+            "challenge_completed": (event.payload or {}).get("challenge_completed"),
             "step_index": event.step_index,
             "is_success": event.is_success,
             "attempt_number": event.attempt_number,

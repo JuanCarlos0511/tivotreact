@@ -16,6 +16,7 @@ export type TelemetryEventType =
   | 'syntax_error'
   | 'ai_hint_requested'
   | 'level_completed'
+  | 'level_abandoned'
   | 'idle_detected'
   | 'survey_submitted';
 
