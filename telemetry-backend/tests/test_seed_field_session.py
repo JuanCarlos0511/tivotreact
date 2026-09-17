@@ -57,17 +57,17 @@ def test_default_seed_has_29_records_randomly_distributed_between_tablets() -> N
     level_three = [record for record in records if record.max_level == 3]
     assert len(completed) > len(incomplete_challenge)
     assert len(level_three) == 1
-    assert all(
-        180_000 <= record.duration_ms <= 300_000
-        or 360_000 <= record.duration_ms < 480_000
-        for record in completed
-    )
+    assert all(165_000 <= record.duration_ms < 480_000 for record in completed)
     assert max(record.duration_ms for record in records) < 480_000
     assert all(
-        120_000 <= record.duration_ms <= 240_000
+        120_000 <= record.duration_ms <= 300_000
         for record in records
         if not record.challenge_completed
     )
+    assert min(record.duration_ms for record in completed) <= max(
+        record.duration_ms for record in incomplete_challenge
+    )
+    assert any(300_000 <= record.duration_ms < 360_000 for record in completed)
     assert any(record.duration_ms % 1000 for record in records)
     hinted_records = [record for record in records if record.hint_levels]
     assert 1 <= len(hinted_records) <= 5
@@ -77,6 +77,13 @@ def test_default_seed_has_29_records_randomly_distributed_between_tablets() -> N
         for record in hinted_records
         for level_id in record.hint_levels
     )
+    assert Counter(
+        record.tablet_id for record in records if not record.challenge_completed
+    ) == {
+        "Tablet 1": 1,
+        "Tablet 2": 1,
+        "Tablet 3": 4,
+    }
 
 
 def test_seed_has_varied_level_times_attempts_and_retry_errors() -> None:

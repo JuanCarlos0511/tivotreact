@@ -89,8 +89,10 @@ docker compose exec backend python -m app.seeds.field_session --replace
 La limpieza usa la marca interna `metadata.seed`; el prefijo histórico
 `TIV-S0914-` solo se conserva como respaldo para eliminar la primera versión.
 Los IDs nuevos usan el mismo formato anónimo `TIV-XXXXXXXXXX` de la aplicación.
-Los tiempos sintéticos se concentran en 3–5 minutos; los picos poco frecuentes
-son aleatorios entre 6:00 y 7:59, siempre por debajo de 8:00 minutos.
+Los tiempos sintéticos se concentran alrededor de 3–5 minutos y continúan con
+una cola menos frecuente entre 5:00 y 7:59, siempre por debajo de 8:00 minutos.
+Los intervalos de sesiones completadas y no completadas se solapan para evitar
+que el resultado pueda predecirse únicamente a partir del tiempo total.
 Los tiempos se almacenan directamente en milisegundos no redondeados. El seed
 también genera intentos `code_run`/`syntax_error` con categorías variadas antes
 de algunos aciertos, mientras conserva casos resueltos al primer intento.

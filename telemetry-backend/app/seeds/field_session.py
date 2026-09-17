@@ -100,15 +100,15 @@ def _sample_level_durations_ms(
     if max_level == 3:
         target_total = rng.randint(2 * 60_000, 4 * 60_000)
     elif challenge_completed and rng.random() < 0.08:
-        target_total = rng.randint(6 * 60_000, 8 * 60_000 - 1)
+        target_total = rng.randint(5 * 60_000, 8 * 60_000 - 1)
     elif challenge_completed:
-        target_total = round(rng.triangular(195_000, 285_000, 250_000))
+        target_total = round(rng.triangular(165_000, 330_000, 240_000))
+        target_total += min(retry_count * rng.randint(1_500, 3_500), 15_000)
+        target_total = min(target_total, 330_000 - rng.randint(1, 999))
+    else:
+        target_total = round(rng.triangular(2 * 60_000, 5 * 60_000, 210_000))
         target_total += min(retry_count * rng.randint(1_500, 3_500), 15_000)
         target_total = min(target_total, 5 * 60_000 - rng.randint(1, 999))
-    else:
-        target_total = round(rng.triangular(2 * 60_000, 225_000, 175_000))
-        target_total += min(retry_count * rng.randint(1_500, 3_500), 15_000)
-        target_total = min(target_total, 4 * 60_000 - rng.randint(1, 999))
 
     raw_weights: list[float] = []
     for level_id, attempt_count in enumerate(attempts, 1):
@@ -587,7 +587,7 @@ async def _main() -> None:
     print(
         f"Generados: {len(records)} | desafío completo: {completed} | "
         f"desafío no completo: {challenge_incomplete} | nivel 3: {level_three} | "
-        f"picos 6-<8 min: {peaks} | participantes con pistas: {hinted_records} "
+        f"sesiones >5-<8 min: {peaks} | participantes con pistas: {hinted_records} "
         f"({total_hints} pistas)"
     )
     if args.dry_run:
