@@ -225,6 +225,24 @@ def test_terminal_event_explicitly_marks_challenge_result() -> None:
             )
             assert 500 <= transition_ms <= 4_000
 
+        for terminal in (
+            event
+            for event in events
+            if event.event_type == "level_completed"
+        ):
+            successful_run = next(
+                event
+                for event in events
+                if event.level_id == terminal.level_id
+                and event.event_type in {"code_run", "syntax_error"}
+                and event.is_success is True
+            )
+            completion_lag_ms = round(
+                (terminal.timestamp - successful_run.timestamp).total_seconds()
+                * 1000
+            )
+            assert 100 <= completion_lag_ms <= 900
+
         assert all(
             "challenge_completed" not in (event.payload or {})
             for event in events

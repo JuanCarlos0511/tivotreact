@@ -407,6 +407,17 @@ def build_events(record: SeedRecord) -> list[TelemetryEvent]:
         for gap_weight in gap_weights[:-1]:
             elapsed_weight += gap_weight
             attempt_offsets_ms.append(round(duration_ms * elapsed_weight / gap_total))
+        if was_completed:
+            completion_lag_ms = timing_rng.randint(100, 900)
+            minimum_last_offset = (
+                attempt_offsets_ms[-2] + 1
+                if len(attempt_offsets_ms) > 1
+                else 1
+            )
+            attempt_offsets_ms[-1] = max(
+                minimum_last_offset,
+                duration_ms - completion_lag_ms,
+            )
         terminal_payload = common_payload
         if level_id == CHALLENGE_LEVEL:
             terminal_payload = {
