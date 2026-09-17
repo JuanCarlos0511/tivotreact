@@ -45,6 +45,7 @@ class SeedRecord:
     tablet_id: str
     started_at: datetime
     duration_ms: int
+    level_duration_ms: tuple[int, ...]
     max_level: int
     challenge_completed: bool
     attempts_by_level: tuple[int, ...]
@@ -64,12 +65,59 @@ def _sample_outcome(rng: random.Random) -> tuple[int, bool]:
     return CHALLENGE_LEVEL, True
 
 
-def _sample_duration_ms(rng: random.Random, challenge_completed: bool) -> int:
-    if not challenge_completed:
-        return rng.randint(2 * 60_000, 4 * 60_000)
-    if rng.random() < 0.08:
-        return rng.randint(6 * 60_000, 8 * 60_000 - 1)
-    return round(rng.triangular(3 * 60_000, 5 * 60_000, 4 * 60_000))
+def _sample_attempts(
+    rng: random.Random,
+    level_id: int,
+    challenge_completed: bool,
+) -> int:
+    if level_id == CHALLENGE_LEVEL and not challenge_completed:
+        return rng.choices((1, 2, 3, 4, 5, 6), weights=(15, 28, 25, 16, 10, 6), k=1)[0]
+    attempts_by_level = {
+        1: ((1, 2, 3, 4, 5, 6, 7), (45, 25, 15, 8, 4, 2, 1)),
+        2: ((1, 2, 3, 4, 5, 6), (60, 25, 8, 4, 2, 1)),
+        3: ((1, 2, 3, 4, 5, 6, 7), (55, 22, 11, 6, 3, 2, 1)),
+        4: ((1, 2, 3, 4, 5, 6), (65, 22, 8, 3, 1.5, 0.5)),
+        5: ((1, 2, 3, 4, 5, 6, 7), (55, 25, 10, 5, 3, 1.5, 0.5)),
+    }
+    values, weights = attempts_by_level[level_id]
+    return rng.choices(values, weights=weights, k=1)[0]
+
+
+def _sample_level_durations_ms(
+    rng: random.Random,
+    max_level: int,
+    challenge_completed: bool,
+    attempts: tuple[int, ...],
+) -> tuple[int, ...]:
+    retry_count = sum(max(attempt - 1, 0) for attempt in attempts)
+    if max_level == 3:
+        target_total = rng.randint(2 * 60_000, 4 * 60_000)
+    elif challenge_completed and rng.random() < 0.08:
+        target_total = rng.randint(6 * 60_000, 8 * 60_000 - 1)
+    elif challenge_completed:
+        target_total = round(rng.triangular(3 * 60_000, 285_000, 225_000))
+        target_total += min(retry_count * rng.randint(1_500, 3_500), 15_000)
+        target_total = min(target_total, 5 * 60_000 - rng.randint(1, 999))
+    else:
+        target_total = round(rng.triangular(2 * 60_000, 225_000, 175_000))
+        target_total += min(retry_count * rng.randint(1_500, 3_500), 15_000)
+        target_total = min(target_total, 4 * 60_000 - rng.randint(1, 999))
+
+    raw_weights: list[float] = []
+    for level_id, attempt_count in enumerate(attempts, 1):
+        if level_id == CHALLENGE_LEVEL:
+            base = rng.triangular(2.0, 4.4, 3.2 if challenge_completed else 2.5)
+        else:
+            base = rng.triangular(0.65, 1.75, 1.0)
+        raw_weights.append(base * (1 + 0.16 * (attempt_count - 1)))
+
+    weight_total = sum(raw_weights)
+    durations = [
+        max(1, round(target_total * weight / weight_total))
+        for weight in raw_weights
+    ]
+    durations[-1] += target_total - sum(durations)
+    return tuple(durations)
 
 
 def generate_records(
@@ -96,16 +144,29 @@ def generate_records(
         tablet_counts[allocation_rng.randrange(len(TABLETS))] += 1
 
     rng = random.Random(random_seed)
-    pending: list[tuple[str, datetime, int, int, bool, tuple[int, ...]]] = []
+    pending: list[
+        tuple[str, datetime, int, tuple[int, ...], int, bool, tuple[int, ...]]
+    ] = []
 
     for tablet_index, (tablet_id, record_count) in enumerate(zip(TABLETS, tablet_counts)):
-        tablet_records: list[tuple[int, int, bool, tuple[int, ...]]] = []
+        tablet_records: list[
+            tuple[int, tuple[int, ...], int, bool, tuple[int, ...]]
+        ] = []
         for _ in range(record_count):
             max_level, challenge_completed = _sample_outcome(rng)
-            duration_ms = _sample_duration_ms(rng, challenge_completed)
-            attempts = tuple(rng.choices((1, 2, 3), weights=(72, 23, 5), k=max_level))
+            attempts = tuple(
+                _sample_attempts(rng, level_id, challenge_completed)
+                for level_id in range(1, max_level + 1)
+            )
+            level_durations = _sample_level_durations_ms(
+                rng,
+                max_level,
+                challenge_completed,
+                attempts,
+            )
+            duration_ms = sum(level_durations)
             tablet_records.append(
-                (duration_ms, max_level, challenge_completed, attempts)
+                (duration_ms, level_durations, max_level, challenge_completed, attempts)
             )
 
         initial_offset_ms = tablet_index * 17_000
@@ -122,9 +183,23 @@ def generate_records(
         gaps[-1] += gap_ms - sum(gaps)
 
         cursor = window_start + timedelta(milliseconds=initial_offset_ms)
-        for record_index, (duration_ms, max_level, challenge_completed, attempts) in enumerate(tablet_records):
+        for record_index, (
+            duration_ms,
+            level_durations,
+            max_level,
+            challenge_completed,
+            attempts,
+        ) in enumerate(tablet_records):
             pending.append(
-                (tablet_id, cursor, duration_ms, max_level, challenge_completed, attempts)
+                (
+                    tablet_id,
+                    cursor,
+                    duration_ms,
+                    level_durations,
+                    max_level,
+                    challenge_completed,
+                    attempts,
+                )
             )
             cursor += timedelta(milliseconds=duration_ms)
             if record_index < record_count - 1:
@@ -133,37 +208,68 @@ def generate_records(
     # Con muestras pequeñas un evento del 2% puede no aparecer. Conservamos la
     # probabilidad durante la generación, pero garantizamos un único caso raro
     # para que el dashboard de demostración siempre represente ese escenario.
-    if not any(item[3] == 3 for item in pending):
+    if not any(item[4] == 3 for item in pending):
         fallback_index = next(
-            (index for index, item in enumerate(pending) if not item[4]),
+            (index for index, item in enumerate(pending) if not item[5]),
             len(pending) - 1,
         )
-        tablet_id, started_at, duration, _, _, attempts = pending[fallback_index]
+        tablet_id, started_at, _, _, _, _, attempts = pending[fallback_index]
+        shortened_attempts = attempts[:3]
+        shortened_durations = _sample_level_durations_ms(
+            random.Random(random_seed ^ 0x13A11),
+            3,
+            False,
+            shortened_attempts,
+        )
         pending[fallback_index] = (
             tablet_id,
             started_at,
-            duration,
+            sum(shortened_durations),
+            shortened_durations,
             3,
             False,
-            attempts[:3],
+            shortened_attempts,
         )
 
     pending.sort(key=lambda item: (item[1], item[0]))
     hint_rng = random.Random(random_seed ^ 0x71A17)
     records: list[SeedRecord] = []
-    for index, (tablet_id, started_at, duration, max_level, completed, attempts) in enumerate(pending, 1):
+    for index, (
+        tablet_id,
+        started_at,
+        duration,
+        level_durations,
+        max_level,
+        completed,
+        attempts,
+    ) in enumerate(pending, 1):
         participant_key = uuid.uuid5(
             UUID_NAMESPACE,
             f"{SEED_NAME}:{random_seed}:{study_date.isoformat()}:{index}",
         )
         participant_id = f"TIV-{participant_key.hex[:10].upper()}"
         session_id = uuid.uuid5(UUID_NAMESPACE, f"{SEED_NAME}:{random_seed}:{participant_id}")
-        hint_roll = hint_rng.random()
-        hint_count = 2 if hint_roll < 0.03 else 1 if hint_roll < 0.13 else 0
-        hint_levels = tuple(
-            max_level if hint_rng.random() < 0.65 else hint_rng.randint(1, max_level)
-            for _ in range(hint_count)
-        )
+        hint_slots = [
+            level_id
+            for level_id, attempt_count in enumerate(attempts, 1)
+            for _ in range(attempt_count - 1)
+        ]
+        hint_count = 0
+        if hint_slots and hint_rng.random() < 0.18:
+            hint_count = min(2 if hint_rng.random() < 0.16 else 1, len(hint_slots))
+        selected_hint_levels: list[int] = []
+        for _ in range(hint_count):
+            hint_weights = [
+                1.5 if level_id in {3, 5} else 1.0
+                for level_id in hint_slots
+            ]
+            slot_index = hint_rng.choices(
+                range(len(hint_slots)),
+                weights=hint_weights,
+                k=1,
+            )[0]
+            selected_hint_levels.append(hint_slots.pop(slot_index))
+        hint_levels = tuple(selected_hint_levels)
         records.append(
             SeedRecord(
                 participant_id=participant_id,
@@ -171,6 +277,7 @@ def generate_records(
                 tablet_id=tablet_id,
                 started_at=started_at,
                 duration_ms=duration,
+                level_duration_ms=level_durations,
                 max_level=max_level,
                 challenge_completed=completed,
                 attempts_by_level=attempts,
@@ -178,14 +285,6 @@ def generate_records(
             )
         )
     return records
-
-
-def _split_duration(total_ms: int, level_count: int) -> list[int]:
-    weights = [18, 17, 17, 18, 30][:level_count]
-    weight_total = sum(weights)
-    durations = [max(1, round(total_ms * weight / weight_total)) for weight in weights]
-    durations[-1] += total_ms - sum(durations)
-    return durations
 
 
 def _seeded_error(record: SeedRecord, level_id: int, attempt_number: int) -> tuple[str, str]:
@@ -206,7 +305,7 @@ def build_events(record: SeedRecord) -> list[TelemetryEvent]:
     """Crea eventos consistentes; el último indica éxito o abandono explícito."""
     events: list[TelemetryEvent] = []
     cursor = record.started_at
-    durations = _split_duration(record.duration_ms, record.max_level)
+    durations = record.level_duration_ms
     common_payload = {
         "tablet_id": record.tablet_id,
         "seed": SEED_NAME,
@@ -227,6 +326,8 @@ def build_events(record: SeedRecord) -> list[TelemetryEvent]:
     for level_id, (duration_ms, attempts) in enumerate(
         zip(durations, record.attempts_by_level), 1
     ):
+        is_last_level = level_id == record.max_level
+        was_completed = not is_last_level or record.challenge_completed
         events.append(
             TelemetryEvent(
                 id=uuid.uuid5(record.session_id, f"level-{level_id}-started"),
@@ -244,8 +345,12 @@ def build_events(record: SeedRecord) -> list[TelemetryEvent]:
             if hint_level == level_id
         ]
         for position, hint_index in enumerate(level_hints, 1):
+            # Una pista aparece después de una ejecución fallida y antes del
+            # siguiente intento, como sucedería durante una sesión real.
             hint_timestamp = cursor + timedelta(
-                milliseconds=round(duration_ms * position / (len(level_hints) + 1))
+                milliseconds=round(
+                    duration_ms * (position + 0.5) / (attempts + 1)
+                )
             )
             hint_type = "Conceptual" if hint_index % 3 else "Corrección de Sintaxis"
             events.append(
@@ -256,13 +361,11 @@ def build_events(record: SeedRecord) -> list[TelemetryEvent]:
                     level_id=level_id,
                     event_type="ai_hint_requested",
                     ai_hint_type=hint_type,
-                    ai_hint_effective=hint_index % 4 != 0,
+                    ai_hint_effective=was_completed,
                     payload=common_payload,
                     timestamp=hint_timestamp,
                 )
             )
-        is_last_level = level_id == record.max_level
-        was_completed = not is_last_level or record.challenge_completed
         for attempt_number in range(1, attempts + 1):
             attempt_succeeded = was_completed and attempt_number == attempts
             error_category = None

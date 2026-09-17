@@ -47,14 +47,78 @@ def test_default_seed_has_29_records_randomly_distributed_between_tablets() -> N
     level_three = [record for record in records if record.max_level == 3]
     assert len(completed) > len(incomplete_challenge)
     assert len(level_three) == 1
-    assert all(180_000 <= record.duration_ms <= 300_000 or 360_000 <= record.duration_ms < 480_000 for record in completed)
+    assert all(
+        180_000 <= record.duration_ms <= 300_000
+        or 360_000 <= record.duration_ms < 480_000
+        for record in completed
+    )
     assert max(record.duration_ms for record in records) < 480_000
-    assert all(120_000 <= record.duration_ms <= 240_000 for record in records if not record.challenge_completed)
+    assert all(
+        120_000 <= record.duration_ms <= 240_000
+        for record in records
+        if not record.challenge_completed
+    )
     assert any(record.duration_ms % 1000 for record in records)
     hinted_records = [record for record in records if record.hint_levels]
-    assert len(hinted_records) == 2
-    assert sum(len(record.hint_levels) for record in hinted_records) == 3
+    assert 1 <= len(hinted_records) <= 5
     assert all(1 <= len(record.hint_levels) <= 2 for record in hinted_records)
+    assert all(
+        record.attempts_by_level[level_id - 1] > 1
+        for record in hinted_records
+        for level_id in record.hint_levels
+    )
+
+
+def test_seed_has_varied_level_times_attempts_and_retry_errors() -> None:
+    records = generate_records()
+
+    assert all(sum(record.level_duration_ms) == record.duration_ms for record in records)
+    assert not any(
+        record.level_duration_ms[0] == record.level_duration_ms[3]
+        for record in records
+        if record.max_level >= 4
+    )
+    assert not any(
+        record.level_duration_ms[1] == record.level_duration_ms[2]
+        for record in records
+        if record.max_level >= 3
+    )
+    all_attempts = [attempt for record in records for attempt in record.attempts_by_level]
+    assert max(all_attempts) >= 5
+    assert {1, 2, 3}.issubset(all_attempts)
+
+    seeded_failures = [
+        event
+        for record in records
+        for event in build_events(record)
+        if event.event_type in {"code_run", "syntax_error"} and event.is_success is False
+    ]
+    assert len({event.participant_id for event in seeded_failures}) >= 20
+    assert {event.error_category for event in seeded_failures} == {
+        "INCOMPLETE_ALGORITHM",
+        "LOGIC_BUSINESS_RULE",
+        "SYNTAX_ERROR",
+        "RUNTIME_EXCEPTION",
+    }
+    for record in records:
+        events = build_events(record)
+        for hint in (event for event in events if event.event_type == "ai_hint_requested"):
+            failed_attempts = [
+                event
+                for event in events
+                if event.level_id == hint.level_id
+                and event.event_type in {"code_run", "syntax_error"}
+                and event.is_success is False
+            ]
+            later_attempts = [
+                event
+                for event in events
+                if event.level_id == hint.level_id
+                and event.event_type in {"code_run", "syntax_error"}
+                and event.timestamp > hint.timestamp
+            ]
+            assert any(event.timestamp < hint.timestamp for event in failed_attempts)
+            assert later_attempts
 
 
 def test_terminal_event_explicitly_marks_challenge_result() -> None:
@@ -127,14 +191,21 @@ def test_seed_is_idempotent_and_visible_in_analytics(tmp_path) -> None:
         "Tablet 2": 11,
         "Tablet 3": 11,
     }
-    assert Counter(item["challenge_status"] for item in participants["items"]) == {
-        "Completado": 25,
-        "No completado": 3,
-        "No alcanzado": 1,
-    }
-    assert max(item["total_hints_used"] for item in participants["items"]) == 2
-    assert sum(item["total_hints_used"] > 0 for item in participants["items"]) == 2
-    assert overview["completed_participants"] == 25
+    expected_statuses = Counter(
+        "Completado"
+        if record.challenge_completed
+        else "No completado"
+        if record.max_level == 5
+        else "No alcanzado"
+        for record in generate_records()
+    )
+    assert (
+        Counter(item["challenge_status"] for item in participants["items"])
+        == expected_statuses
+    )
+    assert max(item["total_hints_used"] for item in participants["items"]) <= 2
+    assert 1 <= sum(item["total_hints_used"] > 0 for item in participants["items"]) <= 5
+    assert overview["completed_participants"] == expected_statuses["Completado"]
 
 
 def test_seed_cleanup_and_separate_legacy_level_five_promotion(tmp_path) -> None:
