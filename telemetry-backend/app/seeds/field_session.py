@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
@@ -28,9 +28,11 @@ from app.db.base import Base
 from app.models.event import TelemetryEvent
 from app.models.participant import Participant
 from app.models.session import Session
+from app.models.survey import SurveyResponse
 
 
 SEED_NAME = "field-session-2026-09-14"
+LEGACY_SEED_PREFIX = "TIV-S0914-"
 UUID_NAMESPACE = uuid.UUID("b7b88725-f7cd-4dcf-a64d-9ff43b7baed4")
 TABLETS = ("Tablet 1", "Tablet 2", "Tablet 3")
 CHALLENGE_LEVEL = 5
@@ -66,7 +68,7 @@ def _sample_duration_seconds(rng: random.Random, challenge_completed: bool) -> i
     if not challenge_completed:
         return rng.randint(2 * 60, 4 * 60)
     if rng.random() < 0.08:
-        return rng.randint(10 * 60, 11 * 60)
+        return rng.randint(6 * 60, 8 * 60 - 1)
     return round(rng.triangular(3 * 60, 5 * 60, 4 * 60))
 
 
@@ -77,16 +79,21 @@ def generate_records(
     end_time: time = time(13, 48),
     timezone_name: str = "America/Mexico_City",
     random_seed: int = 20260914,
-    tablet_counts: tuple[int, int, int] = (15, 18, 11),
+    total_records: int = 29,
 ) -> list[SeedRecord]:
-    """Genera cantidades diferenciadas de sesiones por tablet en toda la ventana."""
+    """Genera sesiones y las reparte aleatoriamente entre las tres tablets."""
     timezone = ZoneInfo(timezone_name)
     window_start = datetime.combine(study_date, start_time, timezone)
     window_end = datetime.combine(study_date, end_time, timezone)
     if window_end <= window_start:
         raise ValueError("La hora final debe ser posterior a la hora inicial")
-    if len(tablet_counts) != len(TABLETS) or any(count < 1 for count in tablet_counts):
-        raise ValueError("tablet_counts debe contener tres cantidades positivas")
+    if total_records < len(TABLETS):
+        raise ValueError("total_records debe permitir al menos un registro por tablet")
+
+    allocation_rng = random.Random(random_seed ^ 0x7AB1E7)
+    tablet_counts = [1] * len(TABLETS)
+    for _ in range(total_records - len(TABLETS)):
+        tablet_counts[allocation_rng.randrange(len(TABLETS))] += 1
 
     rng = random.Random(random_seed)
     pending: list[tuple[str, datetime, int, int, bool, tuple[int, ...]]] = []
@@ -145,7 +152,11 @@ def generate_records(
     hint_rng = random.Random(random_seed ^ 0x71A17)
     records: list[SeedRecord] = []
     for index, (tablet_id, started_at, duration, max_level, completed, attempts) in enumerate(pending, 1):
-        participant_id = f"TIV-S{study_date:%m%d}-{index:03d}"
+        participant_key = uuid.uuid5(
+            UUID_NAMESPACE,
+            f"{SEED_NAME}:{random_seed}:{study_date.isoformat()}:{index}",
+        )
+        participant_id = f"TIV-{participant_key.hex[:10].upper()}"
         session_id = uuid.uuid5(UUID_NAMESPACE, f"{SEED_NAME}:{random_seed}:{participant_id}")
         hint_roll = hint_rng.random()
         hint_count = 2 if hint_roll < 0.03 else 1 if hint_roll < 0.13 else 0
@@ -313,6 +324,40 @@ async def seed_records(
     return len(new_records)
 
 
+async def delete_seed_records(db: AsyncSession) -> int:
+    """Elimina solamente participantes identificados como datos de este seeder."""
+    participants_result = await db.execute(
+        select(Participant).where(
+            or_(
+                Participant.anonymous_code.like(f"{LEGACY_SEED_PREFIX}%"),
+                Participant.metadata_json.is_not(None),
+            )
+        )
+    )
+    candidates = participants_result.scalars().all()
+    participant_ids = [
+        participant.anonymous_code
+        for participant in candidates
+        if participant.anonymous_code.startswith(LEGACY_SEED_PREFIX)
+        or (participant.metadata_json or {}).get("seed") == SEED_NAME
+    ]
+    if not participant_ids:
+        return 0
+
+    await db.execute(
+        delete(SurveyResponse).where(SurveyResponse.participant_id.in_(participant_ids))
+    )
+    await db.execute(
+        delete(TelemetryEvent).where(TelemetryEvent.participant_id.in_(participant_ids))
+    )
+    await db.execute(delete(Session).where(Session.participant_id.in_(participant_ids)))
+    await db.execute(
+        delete(Participant).where(Participant.anonymous_code.in_(participant_ids))
+    )
+    await db.flush()
+    return len(participant_ids)
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--date", default="2026-09-14", help="Fecha YYYY-MM-DD")
@@ -320,30 +365,33 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--end", default="13:48", help="Hora final HH:MM")
     parser.add_argument("--timezone", default="America/Mexico_City")
     parser.add_argument("--seed", type=int, default=20260914)
-    parser.add_argument(
-        "--tablet-counts",
-        default="15,18,11",
-        help="Cantidades para Tablet 1, 2 y 3, separadas por comas",
-    )
+    parser.add_argument("--count", type=int, default=29, help="Total de registros sintéticos")
     parser.add_argument("--condition", default="standard")
     parser.add_argument("--database-url", default=None)
     parser.add_argument("--dry-run", action="store_true")
+    operation = parser.add_mutually_exclusive_group()
+    operation.add_argument(
+        "--delete-seed",
+        action="store_true",
+        help="Elimina los registros de este seeder y termina",
+    )
+    operation.add_argument(
+        "--replace",
+        action="store_true",
+        help="Reemplaza el seed anterior por la versión actual",
+    )
     return parser.parse_args()
 
 
 async def _main() -> None:
     args = _parse_args()
-    try:
-        tablet_counts = tuple(int(value.strip()) for value in args.tablet_counts.split(","))
-    except ValueError as error:
-        raise SystemExit("--tablet-counts debe usar el formato 15,18,11") from error
     records = generate_records(
         study_date=date.fromisoformat(args.date),
         start_time=time.fromisoformat(args.start),
         end_time=time.fromisoformat(args.end),
         timezone_name=args.timezone,
         random_seed=args.seed,
-        tablet_counts=tablet_counts,
+        total_records=args.count,
     )
     completed = sum(record.challenge_completed for record in records)
     challenge_incomplete = sum(
@@ -351,16 +399,18 @@ async def _main() -> None:
         for record in records
     )
     level_three = sum(record.max_level == 3 for record in records)
-    peaks = sum(record.duration_seconds >= 10 * 60 for record in records)
+    peaks = sum(record.duration_seconds > 5 * 60 for record in records)
     hinted_records = sum(bool(record.hint_levels) for record in records)
     total_hints = sum(len(record.hint_levels) for record in records)
     print(
         f"Generados: {len(records)} | desafío completo: {completed} | "
         f"desafío no completo: {challenge_incomplete} | nivel 3: {level_three} | "
-        f"picos 10-11 min: {peaks} | participantes con pistas: {hinted_records} "
+        f"picos 6-<8 min: {peaks} | participantes con pistas: {hinted_records} "
         f"({total_hints} pistas)"
     )
     if args.dry_run:
+        requested_operation = "reemplazar" if args.replace else "eliminar" if args.delete_seed else "insertar"
+        print(f"Operación prevista: {requested_operation} seed.")
         print("Dry run: no se modificó la base de datos.")
         return
 
@@ -370,8 +420,18 @@ async def _main() -> None:
             await connection.run_sync(Base.metadata.create_all)
         factory = async_sessionmaker(engine, expire_on_commit=False)
         async with factory() as db:
+            deleted = 0
+            if args.delete_seed or args.replace:
+                deleted = await delete_seed_records(db)
+            if args.delete_seed:
+                await db.commit()
+                print(f"Participantes sintéticos eliminados: {deleted}.")
+                return
             inserted = await seed_records(db, records, condition=args.condition)
-        print(f"Sesiones insertadas: {inserted}. Ya existentes: {len(records) - inserted}.")
+        print(
+            f"Seed anterior eliminado: {deleted} | sesiones insertadas: {inserted} | "
+            f"ya existentes: {len(records) - inserted}."
+        )
     finally:
         await engine.dispose()
 

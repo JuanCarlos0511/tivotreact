@@ -54,8 +54,8 @@ El contenedor del backend ejecuta `alembic upgrade head` antes de iniciar FastAP
 
 ## Seeder de la jornada del 14 de septiembre
 
-El backend incluye un seeder idempotente para generar 15, 18 y 11 participaciones
-en las tablets 1, 2 y 3 respectivamente (44 en total), distribuidas entre las 09:21 y las 13:48
+El backend incluye un seeder idempotente para generar 29 participaciones en
+total, repartidas aleatoriamente entre las tablets 1, 2 y 3 y distribuidas entre las 09:21 y las 13:48
 en la zona horaria de Ciudad de México. Antes de insertarlas puede revisarse el
 resumen sin modificar la base:
 
@@ -67,8 +67,30 @@ docker compose exec backend python -m app.seeds.field_session --dry-run
 docker compose exec backend python -m app.seeds.field_session
 ```
 
-Las cantidades pueden ajustarse, por ejemplo, con `--tablet-counts 12,16,14`, y una segunda ejecución con la
+La cantidad total puede ajustarse, por ejemplo, con `--count 24`, y una segunda ejecución con la
 misma configuración no duplica registros.
+
+La corrección de registros originales se ejecuta por separado y antes del
+seeder. Convierte de forma reproducible aproximadamente 80% de las sesiones que
+terminaron en N4 a N5 completado y 20% a N5 no completado:
+
+```bash
+docker compose exec backend python -m app.seeds.promote_legacy_level_five --dry-run
+docker compose exec backend python -m app.seeds.promote_legacy_level_five
+```
+
+Después se sustituye el seed anterior, sin volver a modificar los originales:
+
+```bash
+docker compose exec backend python -m app.seeds.field_session --replace --dry-run
+docker compose exec backend python -m app.seeds.field_session --replace
+```
+
+La limpieza usa la marca interna `metadata.seed`; el prefijo histórico
+`TIV-S0914-` solo se conserva como respaldo para eliminar la primera versión.
+Los IDs nuevos usan el mismo formato anónimo `TIV-XXXXXXXXXX` de la aplicación.
+Los tiempos sintéticos se concentran en 3–5 minutos; los picos poco frecuentes
+son aleatorios entre 6:00 y 7:59, siempre por debajo de 8:00 minutos.
 
 La telemetría utiliza IDs anónimos, una cola persistente offline-first e ingesta idempotente. No se envían nombre, correo, IP, agente de usuario ni resolución de pantalla.
 

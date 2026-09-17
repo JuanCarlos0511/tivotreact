@@ -1,6 +1,8 @@
 import asyncio
 from collections import Counter
-from datetime import time
+from datetime import datetime, time, timezone
+import re
+import uuid
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -11,18 +13,29 @@ from app.db.base import Base
 from app.models.event import TelemetryEvent
 from app.models.participant import Participant
 from app.models.session import Session
-from app.seeds.field_session import build_events, generate_records, seed_records
+from app.seeds.field_session import (
+    build_events,
+    delete_seed_records,
+    generate_records,
+    seed_records,
+)
+from app.seeds.promote_legacy_level_five import (
+    CORRECTION_NAME,
+    apply_legacy_promotions,
+    plan_legacy_promotions,
+)
 
 
-def test_default_seed_has_different_counts_per_tablet_and_expected_distribution() -> None:
+def test_default_seed_has_29_records_randomly_distributed_between_tablets() -> None:
     records = generate_records()
 
-    assert len(records) == 44
+    assert len(records) == 29
     assert Counter(record.tablet_id for record in records) == {
-        "Tablet 1": 15,
-        "Tablet 2": 18,
+        "Tablet 1": 7,
+        "Tablet 2": 11,
         "Tablet 3": 11,
     }
+    assert all(re.fullmatch(r"TIV-[0-9A-F]{10}", record.participant_id) for record in records)
     assert min(record.started_at.timetz().replace(tzinfo=None) for record in records) == time(9, 21)
     assert max(record.ended_at.timetz().replace(tzinfo=None) for record in records) == time(13, 48)
 
@@ -34,11 +47,12 @@ def test_default_seed_has_different_counts_per_tablet_and_expected_distribution(
     level_three = [record for record in records if record.max_level == 3]
     assert len(completed) > len(incomplete_challenge)
     assert len(level_three) == 1
-    assert all(180 <= record.duration_seconds <= 300 or 600 <= record.duration_seconds <= 660 for record in completed)
+    assert all(180 <= record.duration_seconds <= 300 or 360 <= record.duration_seconds < 480 for record in completed)
+    assert max(record.duration_seconds for record in records) < 480
     assert all(120 <= record.duration_seconds <= 240 for record in records if not record.challenge_completed)
     hinted_records = [record for record in records if record.hint_levels]
-    assert len(hinted_records) == 6
-    assert sum(len(record.hint_levels) for record in hinted_records) == 7
+    assert len(hinted_records) == 2
+    assert sum(len(record.hint_levels) for record in hinted_records) == 3
     assert all(1 <= len(record.hint_levels) <= 2 for record in hinted_records)
 
 
@@ -89,21 +103,111 @@ def test_seed_is_idempotent_and_visible_in_analytics(tmp_path) -> None:
             await engine.dispose()
 
     first, second, counts, participants, overview = asyncio.run(run())
-    assert first == 44
+    assert first == 29
     assert second == 0
-    assert counts[0] == counts[1] == 44
-    assert counts[2] > 44
-    assert participants["total"] == 44
+    assert counts[0] == counts[1] == 29
+    assert counts[2] > 29
+    assert participants["total"] == 29
     assert Counter(item["tablet_id"] for item in participants["items"]) == {
-        "Tablet 1": 15,
-        "Tablet 2": 18,
+        "Tablet 1": 7,
+        "Tablet 2": 11,
         "Tablet 3": 11,
     }
     assert Counter(item["challenge_status"] for item in participants["items"]) == {
-        "Completado": 33,
-        "No completado": 10,
+        "Completado": 25,
+        "No completado": 3,
         "No alcanzado": 1,
     }
     assert max(item["total_hints_used"] for item in participants["items"]) == 2
-    assert sum(item["total_hints_used"] > 0 for item in participants["items"]) == 6
-    assert overview["completed_participants"] == 33
+    assert sum(item["total_hints_used"] > 0 for item in participants["items"]) == 2
+    assert overview["completed_participants"] == 25
+
+
+def test_seed_cleanup_and_separate_legacy_level_five_promotion(tmp_path) -> None:
+    async def run() -> tuple[int, int, int, int, int, list[int], int]:
+        engine = create_async_engine(
+            f"sqlite+aiosqlite:///{tmp_path / 'cleanup.db'}",
+            poolclass=NullPool,
+        )
+        try:
+            async with engine.begin() as connection:
+                await connection.run_sync(Base.metadata.create_all)
+            factory = async_sessionmaker(engine, expire_on_commit=False)
+            async with factory() as db:
+                await seed_records(db, generate_records())
+
+            observed_at = datetime(2026, 9, 14, 12, 9, tzinfo=timezone.utc)
+            async with factory() as db:
+                legacy_session_ids = [uuid.uuid4() for _ in range(5)]
+                for index, legacy_session_id in enumerate(legacy_session_ids):
+                    participant_id = f"TIV-{index + 1:010X}"
+                    db.add(Participant(anonymous_code=participant_id, created_at=observed_at, metadata_json={}))
+                await db.flush()
+                for index, legacy_session_id in enumerate(legacy_session_ids):
+                    participant_id = f"TIV-{index + 1:010X}"
+                    db.add(
+                        Session(
+                            id=legacy_session_id,
+                            participant_id=participant_id,
+                            condition="standard",
+                            has_assent=True,
+                            started_at=observed_at,
+                            completed_at=observed_at,
+                        )
+                    )
+                await db.flush()
+                for index, legacy_session_id in enumerate(legacy_session_ids):
+                    db.add(
+                        TelemetryEvent(
+                            session_id=legacy_session_id,
+                            participant_id=f"TIV-{index + 1:010X}",
+                            level_id=4,
+                            event_type="level_completed",
+                            is_success=True,
+                            active_time_ms=180_000,
+                            timestamp=observed_at,
+                        )
+                    )
+                await db.commit()
+
+            async with factory() as db:
+                deleted = await delete_seed_records(db)
+                plans = await plan_legacy_promotions(db)
+                completed, incomplete = await apply_legacy_promotions(db, plans)
+                await db.commit()
+            async with factory() as db:
+                participant_count = await db.scalar(select(func.count(Participant.id)))
+                level_five_count = await db.scalar(
+                    select(func.count(TelemetryEvent.id)).where(
+                        TelemetryEvent.level_id == 5,
+                    )
+                )
+                challenge_times = list(
+                    (
+                        await db.execute(
+                            select(TelemetryEvent.active_time_ms).where(
+                                TelemetryEvent.level_id == 5,
+                                TelemetryEvent.event_type.in_(["level_completed", "level_abandoned"]),
+                            )
+                        )
+                    ).scalars()
+                )
+                second_plans = await plan_legacy_promotions(db)
+                await apply_legacy_promotions(db, second_plans)
+                await db.commit()
+                correction_event_count = await db.scalar(
+                    select(func.count(TelemetryEvent.id)).where(
+                        TelemetryEvent.payload["data_correction"].as_string() == CORRECTION_NAME
+                    )
+                )
+            return deleted, completed, incomplete, participant_count, level_five_count, challenge_times, correction_event_count
+        finally:
+            await engine.dispose()
+
+    deleted, completed, incomplete, participant_count, level_five_count, challenge_times, correction_event_count = asyncio.run(run())
+    assert deleted == 29
+    assert (completed, incomplete) == (4, 1)
+    assert participant_count == 5
+    assert level_five_count == 10
+    assert all(120_000 <= value <= 240_000 for value in challenge_times)
+    assert correction_event_count == 10
