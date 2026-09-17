@@ -94,6 +94,11 @@ son aleatorios entre 6:00 y 7:59, siempre por debajo de 8:00 minutos.
 Los tiempos se almacenan directamente en milisegundos no redondeados. El seed
 también genera intentos `code_run`/`syntax_error` con categorías variadas antes
 de algunos aciertos, mientras conserva casos resueltos al primer intento.
+La distribución está calibrada para que el desafío N5 concentre aproximadamente
+la mitad del tiempo activo, N3 sea el segundo nivel más exigente y N1/N2 tengan
+colas esporádicas de intentos altos. En los reportes, estos registros se
+identifican únicamente mediante `tablet_id`; la marca técnica usada para que
+`--replace` sea seguro no se incluye en CSV, JSON/JSONL ni Excel.
 
 La telemetría utiliza IDs anónimos, una cola persistente offline-first e ingesta idempotente. No se envían nombre, correo, IP, agente de usuario ni resolución de pantalla.
 

@@ -71,13 +71,20 @@ def _sample_attempts(
     challenge_completed: bool,
 ) -> int:
     if level_id == CHALLENGE_LEVEL and not challenge_completed:
-        return rng.choices((1, 2, 3, 4, 5, 6), weights=(15, 28, 25, 16, 10, 6), k=1)[0]
+        return rng.choices(
+            (1, 2, 3, 4, 5, 6, 7, 8),
+            weights=(14, 27, 24, 15, 9, 6, 3, 2),
+            k=1,
+        )[0]
     attempts_by_level = {
-        1: ((1, 2, 3, 4, 5, 6, 7), (45, 25, 15, 8, 4, 2, 1)),
-        2: ((1, 2, 3, 4, 5, 6), (60, 25, 8, 4, 2, 1)),
-        3: ((1, 2, 3, 4, 5, 6, 7), (55, 22, 11, 6, 3, 2, 1)),
-        4: ((1, 2, 3, 4, 5, 6), (65, 22, 8, 3, 1.5, 0.5)),
-        5: ((1, 2, 3, 4, 5, 6, 7), (55, 25, 10, 5, 3, 1.5, 0.5)),
+        1: (
+            (1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15),
+            (30, 20, 14, 10, 8, 6, 4, 3, 2, 1.5, 1.5),
+        ),
+        2: ((1, 2, 3, 4, 5, 6, 7, 8), (45, 22, 12, 8, 5, 3, 2, 1)),
+        3: ((1, 2, 3, 4, 5, 6, 7, 8), (55, 20, 10, 6, 4, 2, 2, 1)),
+        4: ((1, 2, 3, 4, 5, 6), (70, 18, 7, 3, 1.5, 0.5)),
+        5: ((1, 2, 3, 4, 5, 6, 7, 8), (60, 22, 9, 5, 2, 1, 0.5, 0.5)),
     }
     values, weights = attempts_by_level[level_id]
     return rng.choices(values, weights=weights, k=1)[0]
@@ -95,7 +102,7 @@ def _sample_level_durations_ms(
     elif challenge_completed and rng.random() < 0.08:
         target_total = rng.randint(6 * 60_000, 8 * 60_000 - 1)
     elif challenge_completed:
-        target_total = round(rng.triangular(3 * 60_000, 285_000, 225_000))
+        target_total = round(rng.triangular(195_000, 285_000, 250_000))
         target_total += min(retry_count * rng.randint(1_500, 3_500), 15_000)
         target_total = min(target_total, 5 * 60_000 - rng.randint(1, 999))
     else:
@@ -105,11 +112,16 @@ def _sample_level_durations_ms(
 
     raw_weights: list[float] = []
     for level_id, attempt_count in enumerate(attempts, 1):
-        if level_id == CHALLENGE_LEVEL:
-            base = rng.triangular(2.0, 4.4, 3.2 if challenge_completed else 2.5)
-        else:
-            base = rng.triangular(0.65, 1.75, 1.0)
-        raw_weights.append(base * (1 + 0.16 * (attempt_count - 1)))
+        level_weight_ranges = {
+            1: (0.9, 1.9, 1.3),
+            2: (0.3, 0.9, 0.5),
+            3: (1.5, 2.8, 2.1),
+            4: (0.3, 0.95, 0.55),
+            5: (4.8, 7.8, 6.3 if challenge_completed else 5.7),
+        }
+        low, high, mode = level_weight_ranges[level_id]
+        base = rng.triangular(low, high, mode)
+        raw_weights.append(base * (1 + 0.10 * (attempt_count - 1)))
 
     weight_total = sum(raw_weights)
     durations = [
@@ -139,6 +151,7 @@ def generate_records(
         raise ValueError("total_records debe permitir al menos un registro por tablet")
 
     allocation_rng = random.Random(random_seed ^ 0x7AB1E7)
+    ending_rng = random.Random(random_seed ^ 0xE0D71E)
     tablet_counts = [1] * len(TABLETS)
     for _ in range(total_records - len(TABLETS)):
         tablet_counts[allocation_rng.randrange(len(TABLETS))] += 1
@@ -170,7 +183,16 @@ def generate_records(
             )
 
         initial_offset_ms = tablet_index * 17_000
-        available_ms = round((window_end - window_start).total_seconds() * 1000) - initial_offset_ms
+        ending_slack_ms = (
+            0
+            if tablet_index == len(TABLETS) - 1
+            else ending_rng.randint(2 * 60_000, 9 * 60_000)
+        )
+        available_ms = (
+            round((window_end - window_start).total_seconds() * 1000)
+            - initial_offset_ms
+            - ending_slack_ms
+        )
         active_ms = sum(item[0] for item in tablet_records)
         gap_ms = available_ms - active_ms
         if gap_ms < 0:
@@ -232,7 +254,6 @@ def generate_records(
         )
 
     pending.sort(key=lambda item: (item[1], item[0]))
-    hint_rng = random.Random(random_seed ^ 0x71A17)
     records: list[SeedRecord] = []
     for index, (
         tablet_id,
@@ -249,13 +270,14 @@ def generate_records(
         )
         participant_id = f"TIV-{participant_key.hex[:10].upper()}"
         session_id = uuid.uuid5(UUID_NAMESPACE, f"{SEED_NAME}:{random_seed}:{participant_id}")
+        hint_rng = random.Random(uuid.uuid5(session_id, "hints").int)
         hint_slots = [
             level_id
             for level_id, attempt_count in enumerate(attempts, 1)
             for _ in range(attempt_count - 1)
         ]
         hint_count = 0
-        if hint_slots and hint_rng.random() < 0.18:
+        if hint_slots and hint_rng.random() < 0.12:
             hint_count = min(2 if hint_rng.random() < 0.16 else 1, len(hint_slots))
         selected_hint_levels: list[int] = []
         for _ in range(hint_count):
@@ -308,7 +330,6 @@ def build_events(record: SeedRecord) -> list[TelemetryEvent]:
     durations = record.level_duration_ms
     common_payload = {
         "tablet_id": record.tablet_id,
-        "seed": SEED_NAME,
     }
 
     events.append(
@@ -328,6 +349,16 @@ def build_events(record: SeedRecord) -> list[TelemetryEvent]:
     ):
         is_last_level = level_id == record.max_level
         was_completed = not is_last_level or record.challenge_completed
+        timing_rng = random.Random(
+            uuid.uuid5(record.session_id, f"timing:level:{level_id}").int
+        )
+        gap_weights = [timing_rng.uniform(0.55, 1.45) for _ in range(attempts + 1)]
+        gap_total = sum(gap_weights)
+        elapsed_weight = 0.0
+        attempt_offsets_ms: list[int] = []
+        for gap_weight in gap_weights[:-1]:
+            elapsed_weight += gap_weight
+            attempt_offsets_ms.append(round(duration_ms * elapsed_weight / gap_total))
         events.append(
             TelemetryEvent(
                 id=uuid.uuid5(record.session_id, f"level-{level_id}-started"),
@@ -347,9 +378,13 @@ def build_events(record: SeedRecord) -> list[TelemetryEvent]:
         for position, hint_index in enumerate(level_hints, 1):
             # Una pista aparece después de una ejecución fallida y antes del
             # siguiente intento, como sucedería durante una sesión real.
+            previous_attempt_ms = attempt_offsets_ms[position - 1]
+            next_attempt_ms = attempt_offsets_ms[position]
             hint_timestamp = cursor + timedelta(
                 milliseconds=round(
-                    duration_ms * (position + 0.5) / (attempts + 1)
+                    previous_attempt_ms
+                    + (next_attempt_ms - previous_attempt_ms)
+                    * timing_rng.uniform(0.3, 0.7)
                 )
             )
             hint_type = "Conceptual" if hint_index % 3 else "Corrección de Sintaxis"
@@ -391,11 +426,8 @@ def build_events(record: SeedRecord) -> list[TelemetryEvent]:
                     error_category=error_category,
                     error_message_snippet=error_message,
                     payload=common_payload,
-                    timestamp=cursor + timedelta(
-                        milliseconds=round(
-                            duration_ms * attempt_number / (attempts + 1)
-                        )
-                    ),
+                    timestamp=cursor
+                    + timedelta(milliseconds=attempt_offsets_ms[attempt_number - 1]),
                 )
             )
         cursor += timedelta(milliseconds=duration_ms)
@@ -417,6 +449,7 @@ def build_events(record: SeedRecord) -> list[TelemetryEvent]:
                 timestamp=cursor,
             )
         )
+    events.sort(key=lambda event: event.timestamp)
     return events
 
 

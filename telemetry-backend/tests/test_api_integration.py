@@ -152,6 +152,8 @@ def test_ingestion_analytics_exports_cors_and_security() -> None:
         )
         assert exported.status_code == 200
         assert len(exported.json()) == 3
+        assert all("data_origin" not in item for item in exported.json())
+        assert all("seed_name" not in item for item in exported.json())
 
         summary_csv = client.get(
             "/api/v1/export/csv?type=summary_by_student",
@@ -159,8 +161,20 @@ def test_ingestion_analytics_exports_cors_and_security() -> None:
         )
         assert summary_csv.status_code == 200
         assert int(summary_csv.headers["content-length"]) == len(summary_csv.content)
-        assert "participant_id,tablet_id" in summary_csv.text
+        assert "participant_id,tablet_id,condition" in summary_csv.text
+        assert "data_origin" not in summary_csv.text
+        assert "seed_name" not in summary_csv.text
         assert "TIV-TEST001" in summary_csv.text
+
+        flat_csv = client.get(
+            "/api/v1/export/csv",
+            headers=admin_headers,
+        )
+        assert flat_csv.status_code == 200
+        assert "participant_id,tablet_id,condition" in flat_csv.text
+        assert "data_origin" not in flat_csv.text
+        assert "seed_name" not in flat_csv.text
+        assert "TIV-TEST001" in flat_csv.text
 
         preflight = client.options(
             "/api/v1/telemetry/events",

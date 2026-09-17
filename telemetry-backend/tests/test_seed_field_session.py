@@ -2,6 +2,7 @@ import asyncio
 from collections import Counter
 from datetime import datetime, time, timezone
 import re
+from statistics import mean, median
 import uuid
 
 from sqlalchemy import func, select
@@ -38,6 +39,15 @@ def test_default_seed_has_29_records_randomly_distributed_between_tablets() -> N
     assert all(re.fullmatch(r"TIV-[0-9A-F]{10}", record.participant_id) for record in records)
     assert min(record.started_at.timetz().replace(tzinfo=None) for record in records) == time(9, 21)
     assert max(record.ended_at.timetz().replace(tzinfo=None) for record in records) == time(13, 48)
+    tablet_end_times = {
+        tablet_id: max(
+            record.ended_at
+            for record in records
+            if record.tablet_id == tablet_id
+        )
+        for tablet_id in {record.tablet_id for record in records}
+    }
+    assert len(set(tablet_end_times.values())) == 3
 
     completed = [record for record in records if record.challenge_completed]
     incomplete_challenge = [
@@ -84,8 +94,40 @@ def test_seed_has_varied_level_times_attempts_and_retry_errors() -> None:
         if record.max_level >= 3
     )
     all_attempts = [attempt for record in records for attempt in record.attempts_by_level]
-    assert max(all_attempts) >= 5
+    assert max(record.attempts_by_level[0] for record in records) >= 10
     assert {1, 2, 3}.issubset(all_attempts)
+    assert 3 <= mean(record.attempts_by_level[0] for record in records) <= 5
+    assert 1.5 <= mean(record.attempts_by_level[1] for record in records) <= 3
+
+    reached_challenge = [record for record in records if record.max_level == 5]
+    challenge_times = [record.level_duration_ms[4] for record in reached_challenge]
+    challenge_shares = [
+        record.level_duration_ms[4] / record.duration_ms
+        for record in reached_challenge
+    ]
+    assert 230_000 <= median(record.duration_ms for record in records) <= 290_000
+    assert 125_000 <= median(challenge_times) <= 180_000
+    assert 0.50 <= median(challenge_shares) <= 0.65
+    assert median(challenge_times) > max(
+        median(record.level_duration_ms[level_index] for record in reached_challenge)
+        for level_index in range(4)
+    )
+
+    retry_heavy = max(records, key=lambda record: max(record.attempts_by_level))
+    retry_level = retry_heavy.attempts_by_level.index(
+        max(retry_heavy.attempts_by_level)
+    ) + 1
+    retry_events = [
+        event
+        for event in build_events(retry_heavy)
+        if event.level_id == retry_level
+        and event.event_type in {"code_run", "syntax_error"}
+    ]
+    retry_gaps = [
+        current.timestamp - previous.timestamp
+        for previous, current in zip(retry_events, retry_events[1:])
+    ]
+    assert len(set(retry_gaps)) > 1
 
     seeded_failures = [
         event
@@ -123,6 +165,11 @@ def test_seed_has_varied_level_times_attempts_and_retry_errors() -> None:
 
 def test_terminal_event_explicitly_marks_challenge_result() -> None:
     records = generate_records()
+    assert all(
+        "seed" not in (event.payload or {})
+        for record in records
+        for event in build_events(record)
+    )
     completed = next(record for record in records if record.challenge_completed)
     incomplete = next(
         record for record in records

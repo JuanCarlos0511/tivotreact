@@ -183,7 +183,10 @@ async def export_xlsx(db: AsyncSession = Depends(get_db)):
     # Sheet 1: Participantes
     ws1 = wb.active
     ws1.title = "1_Participantes"
-    ws1.append(["Participant ID", "Tablet", "Condición", "Asentimiento", "Inicio", "Fin", "Desafío N5 completado"])
+    ws1.append([
+        "Participant ID", "Tablet", "Condición", "Asentimiento", "Inicio", "Fin",
+        "Desafío N5 completado",
+    ])
 
     sessions_q = await db.execute(select(Session).order_by(Session.started_at.asc()))
     sessions = sessions_q.scalars().all()
@@ -204,7 +207,8 @@ async def export_xlsx(db: AsyncSession = Depends(get_db)):
         )
         challenge_completed = (challenge_q.scalar_one() or 0) > 0
         ws1.append([
-            s.participant_id, metadata.get("tablet_id"), s.condition, "Sí" if s.has_assent else "No",
+            s.participant_id, metadata.get("tablet_id"), s.condition,
+            "Sí" if s.has_assent else "No",
             s.started_at.strftime("%Y-%m-%d %H:%M:%S") if s.started_at else "",
             s.completed_at.strftime("%Y-%m-%d %H:%M:%S") if s.completed_at else "",
             "Sí" if challenge_completed else "No",
