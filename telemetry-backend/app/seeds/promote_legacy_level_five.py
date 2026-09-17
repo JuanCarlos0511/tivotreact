@@ -35,7 +35,7 @@ class LegacyLevelFivePlan:
     participant_id: str
     last_original_timestamp: datetime
     challenge_completed: bool
-    challenge_time_seconds: int
+    challenge_time_ms: int
     attempt_number: int
     previous_correction_event_ids: tuple[uuid.UUID, ...]
 
@@ -119,7 +119,7 @@ async def plan_legacy_promotions(
                 participant_id=participant_id,
                 last_original_timestamp=last_timestamp,
                 challenge_completed=index in completed_indices,
-                challenge_time_seconds=assignment_rng.randint(2 * 60, 4 * 60),
+                challenge_time_ms=assignment_rng.randint(2 * 60_000, 4 * 60_000),
                 attempt_number=assignment_rng.choices((1, 2, 3), weights=(72, 23, 5), k=1)[0],
                 previous_correction_event_ids=correction_ids,
             )
@@ -146,7 +146,7 @@ async def apply_legacy_promotions(
     completed = 0
     for plan in plans:
         started_at = plan.last_original_timestamp + timedelta(seconds=1)
-        ended_at = started_at + timedelta(seconds=plan.challenge_time_seconds)
+        ended_at = started_at + timedelta(milliseconds=plan.challenge_time_ms)
         terminal_type = "level_completed" if plan.challenge_completed else "level_abandoned"
         payload = {
             "data_correction": CORRECTION_NAME,
@@ -171,7 +171,7 @@ async def apply_legacy_promotions(
                     event_type=terminal_type,
                     is_success=plan.challenge_completed,
                     attempt_number=plan.attempt_number,
-                    active_time_ms=plan.challenge_time_seconds * 1000,
+                    active_time_ms=plan.challenge_time_ms,
                     payload=payload,
                     timestamp=ended_at,
                 ),

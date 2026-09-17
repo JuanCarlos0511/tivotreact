@@ -47,9 +47,10 @@ def test_default_seed_has_29_records_randomly_distributed_between_tablets() -> N
     level_three = [record for record in records if record.max_level == 3]
     assert len(completed) > len(incomplete_challenge)
     assert len(level_three) == 1
-    assert all(180 <= record.duration_seconds <= 300 or 360 <= record.duration_seconds < 480 for record in completed)
-    assert max(record.duration_seconds for record in records) < 480
-    assert all(120 <= record.duration_seconds <= 240 for record in records if not record.challenge_completed)
+    assert all(180_000 <= record.duration_ms <= 300_000 or 360_000 <= record.duration_ms < 480_000 for record in completed)
+    assert max(record.duration_ms for record in records) < 480_000
+    assert all(120_000 <= record.duration_ms <= 240_000 for record in records if not record.challenge_completed)
+    assert any(record.duration_ms % 1000 for record in records)
     hinted_records = [record for record in records if record.hint_levels]
     assert len(hinted_records) == 2
     assert sum(len(record.hint_levels) for record in hinted_records) == 3
@@ -68,6 +69,19 @@ def test_terminal_event_explicitly_marks_challenge_result() -> None:
     incomplete_terminal = build_events(incomplete)[-1]
     assert (completed_terminal.level_id, completed_terminal.event_type, completed_terminal.is_success) == (5, "level_completed", True)
     assert (incomplete_terminal.level_id, incomplete_terminal.event_type, incomplete_terminal.is_success) == (5, "level_abandoned", False)
+    assert completed_terminal.active_time_ms % 1000 != 0
+    seeded_failures = [
+        event
+        for record in records
+        for event in build_events(record)
+        if event.event_type in {"code_run", "syntax_error"} and event.is_success is False
+    ]
+    assert seeded_failures
+    assert {event.error_category for event in seeded_failures} >= {
+        "INCOMPLETE_ALGORITHM",
+        "LOGIC_BUSINESS_RULE",
+        "SYNTAX_ERROR",
+    }
 
 
 def test_seed_is_idempotent_and_visible_in_analytics(tmp_path) -> None:

@@ -153,6 +153,15 @@ def test_ingestion_analytics_exports_cors_and_security() -> None:
         assert exported.status_code == 200
         assert len(exported.json()) == 3
 
+        summary_csv = client.get(
+            "/api/v1/export/csv?type=summary_by_student",
+            headers=admin_headers,
+        )
+        assert summary_csv.status_code == 200
+        assert int(summary_csv.headers["content-length"]) == len(summary_csv.content)
+        assert "participant_id,tablet_id" in summary_csv.text
+        assert "TIV-TEST001" in summary_csv.text
+
         preflight = client.options(
             "/api/v1/telemetry/events",
             headers={

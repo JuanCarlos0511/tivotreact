@@ -3,7 +3,7 @@ import json
 from io import StringIO, BytesIO
 from typing import Optional
 from fastapi import APIRouter, Depends, Query, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
 
@@ -48,7 +48,7 @@ async def stream_student_summary_csv(db: AsyncSession):
             attempts[lvl] = att_q.scalar_one() or 0
 
             time_q = await db.execute(
-                select(TelemetryEvent.active_time_ms)
+                select(func.max(TelemetryEvent.active_time_ms))
                 .where(
                     and_(
                         TelemetryEvent.session_id == s.id,
@@ -57,7 +57,7 @@ async def stream_student_summary_csv(db: AsyncSession):
                     )
                 )
             )
-            t_ms = time_q.scalar_one()
+            t_ms = time_q.scalar_one_or_none()
             times[lvl] = round(t_ms / 1000, 2) if t_ms else 0.0
 
         # Total active time
@@ -130,16 +130,21 @@ async def export_csv(
 ):
     """Descarga de datasets en formato CSV plano."""
     if type == "summary_by_student":
-        filename = "student_metrics_summary.csv"
-        generator = stream_student_summary_csv(db)
-    else:
-        filename = "telemetry_events.csv"
-        generator = stream_csv(db)
+        # Se materializa el resumen pequeño antes de responder. Así cualquier
+        # error ocurre antes de enviar headers y Content-Length siempre coincide.
+        content = "".join([chunk async for chunk in stream_student_summary_csv(db)])
+        return Response(
+            content=content,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": "attachment; filename=student_metrics_summary.csv"
+            },
+        )
 
     return StreamingResponse(
-        generator,
+        stream_csv(db),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        headers={"Content-Disposition": "attachment; filename=telemetry_events.csv"},
     )
 
 @router.get("/jsonl")

@@ -44,7 +44,7 @@ class SeedRecord:
     session_id: uuid.UUID
     tablet_id: str
     started_at: datetime
-    duration_seconds: int
+    duration_ms: int
     max_level: int
     challenge_completed: bool
     attempts_by_level: tuple[int, ...]
@@ -52,7 +52,7 @@ class SeedRecord:
 
     @property
     def ended_at(self) -> datetime:
-        return self.started_at + timedelta(seconds=self.duration_seconds)
+        return self.started_at + timedelta(milliseconds=self.duration_ms)
 
 
 def _sample_outcome(rng: random.Random) -> tuple[int, bool]:
@@ -64,12 +64,12 @@ def _sample_outcome(rng: random.Random) -> tuple[int, bool]:
     return CHALLENGE_LEVEL, True
 
 
-def _sample_duration_seconds(rng: random.Random, challenge_completed: bool) -> int:
+def _sample_duration_ms(rng: random.Random, challenge_completed: bool) -> int:
     if not challenge_completed:
-        return rng.randint(2 * 60, 4 * 60)
+        return rng.randint(2 * 60_000, 4 * 60_000)
     if rng.random() < 0.08:
-        return rng.randint(6 * 60, 8 * 60 - 1)
-    return round(rng.triangular(3 * 60, 5 * 60, 4 * 60))
+        return rng.randint(6 * 60_000, 8 * 60_000 - 1)
+    return round(rng.triangular(3 * 60_000, 5 * 60_000, 4 * 60_000))
 
 
 def generate_records(
@@ -102,33 +102,33 @@ def generate_records(
         tablet_records: list[tuple[int, int, bool, tuple[int, ...]]] = []
         for _ in range(record_count):
             max_level, challenge_completed = _sample_outcome(rng)
-            duration_seconds = _sample_duration_seconds(rng, challenge_completed)
+            duration_ms = _sample_duration_ms(rng, challenge_completed)
             attempts = tuple(rng.choices((1, 2, 3), weights=(72, 23, 5), k=max_level))
             tablet_records.append(
-                (duration_seconds, max_level, challenge_completed, attempts)
+                (duration_ms, max_level, challenge_completed, attempts)
             )
 
-        initial_offset = tablet_index * 17
-        available_seconds = int((window_end - window_start).total_seconds()) - initial_offset
-        active_seconds = sum(item[0] for item in tablet_records)
-        gap_seconds = available_seconds - active_seconds
-        if gap_seconds < 0:
+        initial_offset_ms = tablet_index * 17_000
+        available_ms = round((window_end - window_start).total_seconds() * 1000) - initial_offset_ms
+        active_ms = sum(item[0] for item in tablet_records)
+        gap_ms = available_ms - active_ms
+        if gap_ms < 0:
             raise ValueError("La ventana es demasiado corta para la cantidad de registros")
 
         gap_count = max(record_count - 1, 1)
         gap_weights = [rng.uniform(0.65, 1.35) for _ in range(gap_count)]
         weight_total = sum(gap_weights)
-        gaps = [int(gap_seconds * weight / weight_total) for weight in gap_weights]
-        gaps[-1] += gap_seconds - sum(gaps)
+        gaps = [int(gap_ms * weight / weight_total) for weight in gap_weights]
+        gaps[-1] += gap_ms - sum(gaps)
 
-        cursor = window_start + timedelta(seconds=initial_offset)
-        for record_index, (duration_seconds, max_level, challenge_completed, attempts) in enumerate(tablet_records):
+        cursor = window_start + timedelta(milliseconds=initial_offset_ms)
+        for record_index, (duration_ms, max_level, challenge_completed, attempts) in enumerate(tablet_records):
             pending.append(
-                (tablet_id, cursor, duration_seconds, max_level, challenge_completed, attempts)
+                (tablet_id, cursor, duration_ms, max_level, challenge_completed, attempts)
             )
-            cursor += timedelta(seconds=duration_seconds)
+            cursor += timedelta(milliseconds=duration_ms)
             if record_index < record_count - 1:
-                cursor += timedelta(seconds=gaps[record_index])
+                cursor += timedelta(milliseconds=gaps[record_index])
 
     # Con muestras pequeñas un evento del 2% puede no aparecer. Conservamos la
     # probabilidad durante la generación, pero garantizamos un único caso raro
@@ -170,7 +170,7 @@ def generate_records(
                 session_id=session_id,
                 tablet_id=tablet_id,
                 started_at=started_at,
-                duration_seconds=duration,
+                duration_ms=duration,
                 max_level=max_level,
                 challenge_completed=completed,
                 attempts_by_level=attempts,
@@ -180,19 +180,33 @@ def generate_records(
     return records
 
 
-def _split_duration(total_seconds: int, level_count: int) -> list[int]:
+def _split_duration(total_ms: int, level_count: int) -> list[int]:
     weights = [18, 17, 17, 18, 30][:level_count]
     weight_total = sum(weights)
-    durations = [max(1, round(total_seconds * weight / weight_total)) for weight in weights]
-    durations[-1] += total_seconds - sum(durations)
+    durations = [max(1, round(total_ms * weight / weight_total)) for weight in weights]
+    durations[-1] += total_ms - sum(durations)
     return durations
+
+
+def _seeded_error(record: SeedRecord, level_id: int, attempt_number: int) -> tuple[str, str]:
+    selector = uuid.uuid5(
+        record.session_id,
+        f"error:{level_id}:{attempt_number}",
+    ).int % 100
+    if selector < 35:
+        return "INCOMPLETE_ALGORITHM", "El programa terminó antes de cumplir el objetivo del nivel."
+    if selector < 65:
+        return "LOGIC_BUSINESS_RULE", "La ejecución terminó, pero la ruta no alcanzó la meta esperada."
+    if selector < 85:
+        return "SYNTAX_ERROR", "La estructura del programa necesita una corrección de sintaxis."
+    return "RUNTIME_EXCEPTION", "La ejecución se detuvo al intentar realizar un movimiento no válido."
 
 
 def build_events(record: SeedRecord) -> list[TelemetryEvent]:
     """Crea eventos consistentes; el último indica éxito o abandono explícito."""
     events: list[TelemetryEvent] = []
     cursor = record.started_at
-    durations = _split_duration(record.duration_seconds, record.max_level)
+    durations = _split_duration(record.duration_ms, record.max_level)
     common_payload = {
         "tablet_id": record.tablet_id,
         "seed": SEED_NAME,
@@ -210,7 +224,7 @@ def build_events(record: SeedRecord) -> list[TelemetryEvent]:
         )
     )
 
-    for level_id, (duration_seconds, attempts) in enumerate(
+    for level_id, (duration_ms, attempts) in enumerate(
         zip(durations, record.attempts_by_level), 1
     ):
         events.append(
@@ -231,7 +245,7 @@ def build_events(record: SeedRecord) -> list[TelemetryEvent]:
         ]
         for position, hint_index in enumerate(level_hints, 1):
             hint_timestamp = cursor + timedelta(
-                seconds=round(duration_seconds * position / (len(level_hints) + 1))
+                milliseconds=round(duration_ms * position / (len(level_hints) + 1))
             )
             hint_type = "Conceptual" if hint_index % 3 else "Corrección de Sintaxis"
             events.append(
@@ -247,9 +261,41 @@ def build_events(record: SeedRecord) -> list[TelemetryEvent]:
                     timestamp=hint_timestamp,
                 )
             )
-        cursor += timedelta(seconds=duration_seconds)
         is_last_level = level_id == record.max_level
         was_completed = not is_last_level or record.challenge_completed
+        for attempt_number in range(1, attempts + 1):
+            attempt_succeeded = was_completed and attempt_number == attempts
+            error_category = None
+            error_message = None
+            if not attempt_succeeded:
+                error_category, error_message = _seeded_error(
+                    record,
+                    level_id,
+                    attempt_number,
+                )
+            events.append(
+                TelemetryEvent(
+                    id=uuid.uuid5(
+                        record.session_id,
+                        f"level-{level_id}-attempt-{attempt_number}",
+                    ),
+                    session_id=record.session_id,
+                    participant_id=record.participant_id,
+                    level_id=level_id,
+                    event_type="syntax_error" if error_category == "SYNTAX_ERROR" else "code_run",
+                    is_success=attempt_succeeded,
+                    attempt_number=attempt_number,
+                    error_category=error_category,
+                    error_message_snippet=error_message,
+                    payload=common_payload,
+                    timestamp=cursor + timedelta(
+                        milliseconds=round(
+                            duration_ms * attempt_number / (attempts + 1)
+                        )
+                    ),
+                )
+            )
+        cursor += timedelta(milliseconds=duration_ms)
         event_type = "level_completed" if was_completed else "level_abandoned"
         events.append(
             TelemetryEvent(
@@ -260,7 +306,7 @@ def build_events(record: SeedRecord) -> list[TelemetryEvent]:
                 event_type=event_type,
                 is_success=was_completed,
                 attempt_number=attempts,
-                active_time_ms=duration_seconds * 1000,
+                active_time_ms=duration_ms,
                 payload={
                     **common_payload,
                     "challenge_completed": record.challenge_completed,
@@ -399,7 +445,7 @@ async def _main() -> None:
         for record in records
     )
     level_three = sum(record.max_level == 3 for record in records)
-    peaks = sum(record.duration_seconds > 5 * 60 for record in records)
+    peaks = sum(record.duration_ms > 5 * 60_000 for record in records)
     hinted_records = sum(bool(record.hint_levels) for record in records)
     total_hints = sum(len(record.hint_levels) for record in records)
     print(

@@ -91,6 +91,9 @@ La limpieza usa la marca interna `metadata.seed`; el prefijo histórico
 Los IDs nuevos usan el mismo formato anónimo `TIV-XXXXXXXXXX` de la aplicación.
 Los tiempos sintéticos se concentran en 3–5 minutos; los picos poco frecuentes
 son aleatorios entre 6:00 y 7:59, siempre por debajo de 8:00 minutos.
+Los tiempos se almacenan directamente en milisegundos no redondeados. El seed
+también genera intentos `code_run`/`syntax_error` con categorías variadas antes
+de algunos aciertos, mientras conserva casos resueltos al primer intento.
 
 La telemetría utiliza IDs anónimos, una cola persistente offline-first e ingesta idempotente. No se envían nombre, correo, IP, agente de usuario ni resolución de pantalla.
 
