@@ -101,6 +101,9 @@ la mitad del tiempo activo, N3 sea el segundo nivel más exigente y N1/N2 tengan
 colas esporádicas de intentos altos. En los reportes, estos registros se
 identifican únicamente mediante `tablet_id`; la marca técnica usada para que
 `--replace` sea seguro no se incluye en CSV, JSON/JSONL ni Excel.
+Los eventos incorporan pausas de 0.5–4 segundos al entrar y cambiar de nivel;
+`challenge_completed` se registra solamente al finalizar o abandonar N5 para
+evitar fuga de información futura en análisis longitudinales.
 
 La telemetría utiliza IDs anónimos, una cola persistente offline-first e ingesta idempotente. No se envían nombre, correo, IP, agente de usuario ni resolución de pantalla.
 

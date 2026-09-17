@@ -46,6 +46,7 @@ class SeedRecord:
     started_at: datetime
     duration_ms: int
     level_duration_ms: tuple[int, ...]
+    transition_delay_ms: tuple[int, ...]
     max_level: int
     challenge_completed: bool
     attempts_by_level: tuple[int, ...]
@@ -53,7 +54,9 @@ class SeedRecord:
 
     @property
     def ended_at(self) -> datetime:
-        return self.started_at + timedelta(milliseconds=self.duration_ms)
+        return self.started_at + timedelta(
+            milliseconds=self.duration_ms + sum(self.transition_delay_ms)
+        )
 
 
 def _sample_outcome(rng: random.Random) -> tuple[int, bool]:
@@ -152,18 +155,35 @@ def generate_records(
 
     allocation_rng = random.Random(random_seed ^ 0x7AB1E7)
     ending_rng = random.Random(random_seed ^ 0xE0D71E)
+    transition_rng = random.Random(random_seed ^ 0x7A4517)
     tablet_counts = [1] * len(TABLETS)
     for _ in range(total_records - len(TABLETS)):
         tablet_counts[allocation_rng.randrange(len(TABLETS))] += 1
 
     rng = random.Random(random_seed)
     pending: list[
-        tuple[str, datetime, int, tuple[int, ...], int, bool, tuple[int, ...]]
+        tuple[
+            str,
+            datetime,
+            int,
+            tuple[int, ...],
+            tuple[int, ...],
+            int,
+            bool,
+            tuple[int, ...],
+        ]
     ] = []
 
     for tablet_index, (tablet_id, record_count) in enumerate(zip(TABLETS, tablet_counts)):
         tablet_records: list[
-            tuple[int, tuple[int, ...], int, bool, tuple[int, ...]]
+            tuple[
+                int,
+                tuple[int, ...],
+                tuple[int, ...],
+                int,
+                bool,
+                tuple[int, ...],
+            ]
         ] = []
         for _ in range(record_count):
             max_level, challenge_completed = _sample_outcome(rng)
@@ -178,8 +198,19 @@ def generate_records(
                 attempts,
             )
             duration_ms = sum(level_durations)
+            transition_delays = tuple(
+                transition_rng.randint(500, 4_000)
+                for _ in range(max_level)
+            )
             tablet_records.append(
-                (duration_ms, level_durations, max_level, challenge_completed, attempts)
+                (
+                    duration_ms,
+                    level_durations,
+                    transition_delays,
+                    max_level,
+                    challenge_completed,
+                    attempts,
+                )
             )
 
         initial_offset_ms = tablet_index * 17_000
@@ -193,8 +224,8 @@ def generate_records(
             - initial_offset_ms
             - ending_slack_ms
         )
-        active_ms = sum(item[0] for item in tablet_records)
-        gap_ms = available_ms - active_ms
+        occupied_ms = sum(item[0] + sum(item[2]) for item in tablet_records)
+        gap_ms = available_ms - occupied_ms
         if gap_ms < 0:
             raise ValueError("La ventana es demasiado corta para la cantidad de registros")
 
@@ -208,6 +239,7 @@ def generate_records(
         for record_index, (
             duration_ms,
             level_durations,
+            transition_delays,
             max_level,
             challenge_completed,
             attempts,
@@ -218,24 +250,36 @@ def generate_records(
                     cursor,
                     duration_ms,
                     level_durations,
+                    transition_delays,
                     max_level,
                     challenge_completed,
                     attempts,
                 )
             )
-            cursor += timedelta(milliseconds=duration_ms)
+            cursor += timedelta(
+                milliseconds=duration_ms + sum(transition_delays)
+            )
             if record_index < record_count - 1:
                 cursor += timedelta(milliseconds=gaps[record_index])
 
     # Con muestras pequeñas un evento del 2% puede no aparecer. Conservamos la
     # probabilidad durante la generación, pero garantizamos un único caso raro
     # para que el dashboard de demostración siempre represente ese escenario.
-    if not any(item[4] == 3 for item in pending):
+    if not any(item[5] == 3 for item in pending):
         fallback_index = next(
-            (index for index, item in enumerate(pending) if not item[5]),
+            (index for index, item in enumerate(pending) if not item[6]),
             len(pending) - 1,
         )
-        tablet_id, started_at, _, _, _, _, attempts = pending[fallback_index]
+        (
+            tablet_id,
+            started_at,
+            _,
+            _,
+            transition_delays,
+            _,
+            _,
+            attempts,
+        ) = pending[fallback_index]
         shortened_attempts = attempts[:3]
         shortened_durations = _sample_level_durations_ms(
             random.Random(random_seed ^ 0x13A11),
@@ -248,6 +292,7 @@ def generate_records(
             started_at,
             sum(shortened_durations),
             shortened_durations,
+            transition_delays[:3],
             3,
             False,
             shortened_attempts,
@@ -260,6 +305,7 @@ def generate_records(
         started_at,
         duration,
         level_durations,
+        transition_delays,
         max_level,
         completed,
         attempts,
@@ -300,6 +346,7 @@ def generate_records(
                 started_at=started_at,
                 duration_ms=duration,
                 level_duration_ms=level_durations,
+                transition_delay_ms=transition_delays,
                 max_level=max_level,
                 challenge_completed=completed,
                 attempts_by_level=attempts,
@@ -343,6 +390,7 @@ def build_events(record: SeedRecord) -> list[TelemetryEvent]:
             timestamp=cursor,
         )
     )
+    cursor += timedelta(milliseconds=record.transition_delay_ms[0])
 
     for level_id, (duration_ms, attempts) in enumerate(
         zip(durations, record.attempts_by_level), 1
@@ -359,6 +407,12 @@ def build_events(record: SeedRecord) -> list[TelemetryEvent]:
         for gap_weight in gap_weights[:-1]:
             elapsed_weight += gap_weight
             attempt_offsets_ms.append(round(duration_ms * elapsed_weight / gap_total))
+        terminal_payload = common_payload
+        if level_id == CHALLENGE_LEVEL:
+            terminal_payload = {
+                **common_payload,
+                "challenge_completed": record.challenge_completed,
+            }
         events.append(
             TelemetryEvent(
                 id=uuid.uuid5(record.session_id, f"level-{level_id}-started"),
@@ -442,13 +496,14 @@ def build_events(record: SeedRecord) -> list[TelemetryEvent]:
                 is_success=was_completed,
                 attempt_number=attempts,
                 active_time_ms=duration_ms,
-                payload={
-                    **common_payload,
-                    "challenge_completed": record.challenge_completed,
-                },
+                payload=terminal_payload,
                 timestamp=cursor,
             )
         )
+        if level_id < record.max_level:
+            cursor += timedelta(
+                milliseconds=record.transition_delay_ms[level_id]
+            )
     events.sort(key=lambda event: event.timestamp)
     return events
 

@@ -187,7 +187,49 @@ def test_terminal_event_explicitly_marks_challenge_result() -> None:
     incomplete_terminal = build_events(incomplete)[-1]
     assert (completed_terminal.level_id, completed_terminal.event_type, completed_terminal.is_success) == (5, "level_completed", True)
     assert (incomplete_terminal.level_id, incomplete_terminal.event_type, incomplete_terminal.is_success) == (5, "level_abandoned", False)
+    assert completed_terminal.payload["challenge_completed"] is True
+    assert incomplete_terminal.payload["challenge_completed"] is False
     assert completed_terminal.active_time_ms % 1000 != 0
+    for record in records:
+        events = build_events(record)
+        assert events[-1].timestamp == record.ended_at
+        session_started = next(
+            event for event in events if event.event_type == "session_started"
+        )
+        first_level_started = next(
+            event
+            for event in events
+            if event.event_type == "level_started" and event.level_id == 1
+        )
+        initial_delay_ms = round(
+            (first_level_started.timestamp - session_started.timestamp).total_seconds()
+            * 1000
+        )
+        assert 500 <= initial_delay_ms <= 4_000
+
+        for level_id in range(1, record.max_level):
+            terminal = next(
+                event
+                for event in events
+                if event.level_id == level_id
+                and event.event_type in {"level_completed", "level_abandoned"}
+            )
+            next_started = next(
+                event
+                for event in events
+                if event.level_id == level_id + 1
+                and event.event_type == "level_started"
+            )
+            transition_ms = round(
+                (next_started.timestamp - terminal.timestamp).total_seconds() * 1000
+            )
+            assert 500 <= transition_ms <= 4_000
+
+        assert all(
+            "challenge_completed" not in (event.payload or {})
+            for event in events
+            if event.level_id != 5
+        )
     seeded_failures = [
         event
         for record in records
